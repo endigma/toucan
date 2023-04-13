@@ -9,7 +9,7 @@ import (
 )
 
 func TestSpec(t *testing.T) {
-	t.Run("valid spec", func(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
 		s := spec.Spec{
 			Actor: spec.QualifierSpec{
 				Path: "github.com/endigma/toucan/_examples/basic",
@@ -40,7 +40,7 @@ func TestSpec(t *testing.T) {
 		assert.NoError(t, s.Validate())
 	})
 
-	t.Run("invalid spec (paths)", func(t *testing.T) {
+	t.Run("invalid names", func(t *testing.T) {
 		s := spec.Spec{
 			Actor: spec.QualifierSpec{
 				Path: "github.com/endigma/toucan/_examples/basic",
@@ -71,7 +71,7 @@ func TestSpec(t *testing.T) {
 		assert.Error(t, s.Validate())
 	})
 
-	t.Run("invalid spec (names)", func(t *testing.T) {
+	t.Run("invalid paths", func(t *testing.T) {
 		s := spec.Spec{
 			Actor: spec.QualifierSpec{
 				Path: "asdasd343//112.$asd",
@@ -102,7 +102,7 @@ func TestSpec(t *testing.T) {
 		assert.Error(t, s.Validate())
 	})
 
-	t.Run("invalid spec (duplicate resource names)", func(t *testing.T) {
+	t.Run("duplicate resource names", func(t *testing.T) {
 		resource := spec.ResourceSpec{
 			Name: "Post",
 			Model: spec.QualifierSpec{
@@ -135,7 +135,7 @@ func TestSpec(t *testing.T) {
 		assert.Error(t, s.Validate())
 	})
 
-	t.Run("invalid spec (duplicate role names)", func(t *testing.T) {
+	t.Run("duplicate role names", func(t *testing.T) {
 		role := spec.RoleSpec{
 			Name:        "admin",
 			Permissions: []string{"read", "write"},
@@ -166,7 +166,7 @@ func TestSpec(t *testing.T) {
 		assert.Error(t, s.Validate())
 	})
 
-	t.Run("invalid spec (duplicate attribute names)", func(t *testing.T) {
+	t.Run("duplicate attribute names", func(t *testing.T) {
 		attr := spec.AttributeSpec{
 			Name:        "Attribute",
 			Permissions: []string{"read", "write"},
@@ -197,7 +197,7 @@ func TestSpec(t *testing.T) {
 		assert.Error(t, s.Validate())
 	})
 
-	t.Run("invalid spec (duplicate permission names)", func(t *testing.T) {
+	t.Run("duplicate permission names", func(t *testing.T) {
 		s := spec.Spec{
 			Actor: spec.QualifierSpec{
 				Path: "github.com/endigma/toucan/_examples/basic",
@@ -222,7 +222,7 @@ func TestSpec(t *testing.T) {
 		assert.Error(t, s.Validate())
 	})
 
-	t.Run("invalid spec: unmatched permissions", func(t *testing.T) {
+	t.Run("unmatched permissions", func(t *testing.T) {
 		s := spec.Spec{
 			Actor: spec.QualifierSpec{
 				Path: "github.com/endigma/toucan/_examples/basic",
@@ -253,7 +253,7 @@ func TestSpec(t *testing.T) {
 		assert.Error(t, s.Validate())
 	})
 
-	t.Run("invalid spec: unmatched permissions", func(t *testing.T) {
+	t.Run("unmatched permissions", func(t *testing.T) {
 		s := spec.Spec{
 			Actor: spec.QualifierSpec{
 				Path: "github.com/endigma/toucan/_examples/basic",
@@ -284,7 +284,7 @@ func TestSpec(t *testing.T) {
 		assert.Error(t, s.Validate())
 	})
 
-	t.Run("invalid spec: reserved names", func(t *testing.T) {
+	t.Run("reserved names", func(t *testing.T) {
 		s := spec.Spec{
 			Actor: spec.QualifierSpec{
 				Path: "github.com/endigma/toucan/_examples/basic",
@@ -308,7 +308,7 @@ func TestSpec(t *testing.T) {
 		assert.Error(t, s.Validate())
 	})
 
-	t.Run("invalid spec: role with no perms", func(t *testing.T) {
+	t.Run("role with no perms", func(t *testing.T) {
 		s := spec.Spec{
 			Actor: spec.QualifierSpec{
 				Path: "github.com/endigma/toucan/_examples/basic",
@@ -337,7 +337,7 @@ func TestSpec(t *testing.T) {
 		assert.Error(t, s.Validate())
 	})
 
-	t.Run("invalid spec: attribute with no perms", func(t *testing.T) {
+	t.Run("attribute with no perms", func(t *testing.T) {
 		s := spec.Spec{
 			Actor: spec.QualifierSpec{
 				Path: "github.com/endigma/toucan/_examples/basic",
