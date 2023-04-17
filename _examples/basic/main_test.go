@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/endigma/toucan/_examples/basic/gen/toucan"
@@ -10,6 +11,8 @@ import (
 )
 
 func TestPolicy(t *testing.T) {
+	ctx := context.Background()
+
 	authorizer := toucan.NewAuthorizer(resolvers.NewResolver())
 
 	tom, jerry := models.NewUser("Tom"), models.NewUser("Jerry")

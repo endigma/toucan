@@ -1,26 +1,18 @@
 package resolvers
 
 import (
+	"context"
+
 	"github.com/endigma/toucan/_examples/basic/gen/toucan"
 	"github.com/endigma/toucan/_examples/basic/models"
-	log "github.com/sirupsen/logrus"
 )
 
-func (e *repositoryResolver) HasRoleOwner(user *models.User, repository *models.Repository) bool {
+func (e *repositoryResolver) HasRole(ctx context.Context, user *models.User, role toucan.RepositoryRole, repository *models.Repository) bool {
 	return false
 }
 
-func (e *repositoryResolver) HasRoleEditor(user *models.User, repository *models.Repository) bool {
+func (e *repositoryResolver) HasAttribute(ctx context.Context, attr toucan.RepositoryAttribute, repository *models.Repository) bool {
 	return false
-}
-
-func (e *repositoryResolver) HasRoleViewer(user *models.User, repository *models.Repository) bool {
-	log.Info("Checking if user is viewer of repository", user, repository)
-	return user.Name == "Tom" && repository.Label == "Facebook"
-}
-
-func (e *repositoryResolver) HasAttributePublic(repository *models.Repository) bool {
-	return repository.Public
 }
 
 type repositoryResolver struct{ *Resolver }

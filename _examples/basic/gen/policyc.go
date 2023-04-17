@@ -4,8 +4,8 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/endigma/toucan/api"
-	"github.com/endigma/toucan/codegen/config"
-	"github.com/endigma/toucan/codegen/spec"
+	"github.com/endigma/toucan/config"
+	"github.com/endigma/toucan/spec"
 )
 
 func main() {

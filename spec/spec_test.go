@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/endigma/toucan/codegen/spec"
+	"github.com/endigma/toucan/spec"
 )
 
 func TestSpec(t *testing.T) {

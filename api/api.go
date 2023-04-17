@@ -4,11 +4,11 @@ import (
 	"os"
 
 	"github.com/endigma/toucan/codegen"
-	"github.com/endigma/toucan/codegen/spec"
+	"github.com/endigma/toucan/spec"
 )
 
 func Generate(spec *spec.Spec) error {
-	generator := codegen.NewSpecGenerator(spec)
+	generator := codegen.NewGenerator(spec)
 
 	err := wipeOutputDir(spec)
 	if err != nil {
