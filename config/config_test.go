@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/endigma/toucan/codegen/config"
+	"github.com/endigma/toucan/config"
 )
 
 func TestLoadConfig(t *testing.T) {

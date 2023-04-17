@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"regexp"
 
-	"github.com/endigma/toucan/codegen/config"
+	"github.com/endigma/toucan/config"
 	"github.com/go-playground/validator/v10"
 	"github.com/hashicorp/go-multierror"
 	"github.com/iancoleman/strcase"
@@ -30,14 +30,6 @@ type ResourceSpec struct {
 	Permissions []string        `validate:"unique,dive,required"`
 	Roles       []RoleSpec      `validate:"unique=Name,dive,required"`
 	Attributes  []AttributeSpec `validate:"unique=Name,dive,required"`
-}
-
-func (r ResourceSpec) CamelName() string {
-	return strcase.ToCamel(r.Name)
-}
-
-func (r ResourceSpec) LowerCamelName() string {
-	return strcase.ToLowerCamel(r.Name)
 }
 
 type RoleSpec struct {
@@ -87,6 +79,21 @@ func (s *Spec) Validate() error {
 				if !isValidPerm(permission) {
 					result = multierror.Append(result, fmt.Errorf("invalid permission %q in role %q", permission, role.Name))
 				}
+			}
+		}
+
+		for _, permission := range resource.Permissions {
+			// Catch unused permissions
+			hasAttribute := lo.SomeBy(resource.Attributes, func(attr AttributeSpec) bool {
+				return lo.Contains(attr.Permissions, permission)
+			})
+
+			hasRole := lo.SomeBy(resource.Roles, func(role RoleSpec) bool {
+				return lo.Contains(role.Permissions, permission)
+			})
+
+			if !hasAttribute && !hasRole {
+				result = multierror.Append(result, fmt.Errorf("unused permission %q", permission))
 			}
 		}
 	}
@@ -214,4 +221,37 @@ func nameValidator(fl validator.FieldLevel) bool {
 	}
 
 	return validName(field.String())
+}
+
+type PermissionSource struct {
+	Type string // role, attribute
+	Name string
+}
+
+// GetPermissionSources returns all sources of a permission, and a boolean `true` if the
+func (resource ResourceSpec) GetPermissionSources(permission string) []PermissionSource {
+	sources := lo.Union(
+		lo.FilterMap(resource.Attributes, func(attr AttributeSpec, _ int) (PermissionSource, bool) {
+			if lo.Contains(attr.Permissions, permission) {
+				return PermissionSource{
+					Type: "attribute",
+					Name: strcase.ToCamel(resource.Name + "Attribute" + strcase.ToCamel(attr.Name)),
+				}, true
+			}
+
+			return PermissionSource{}, false
+		}),
+		lo.FilterMap(resource.Roles, func(role RoleSpec, _ int) (PermissionSource, bool) {
+			if lo.Contains(role.Permissions, permission) {
+				return PermissionSource{
+					Type: "role",
+					Name: strcase.ToCamel(resource.Name + "Role" + strcase.ToCamel(role.Name)),
+				}, true
+			}
+
+			return PermissionSource{}, false
+		}),
+	)
+
+	return sources
 }
