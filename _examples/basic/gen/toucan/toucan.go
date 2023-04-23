@@ -29,16 +29,18 @@ var ErrInvalidRepositoryPermission = fmt.Errorf("not a valid repositoryPermissio
 var ErrNilRepositoryPermission = errors.New("value is nil")
 
 const (
-	RepositoryPermissionRead   RepositoryPermission = "read"
-	RepositoryPermissionPush   RepositoryPermission = "push"
-	RepositoryPermissionDelEte RepositoryPermission = "del_ete"
+	RepositoryPermissionRead      RepositoryPermission = "read"
+	RepositoryPermissionPush      RepositoryPermission = "push"
+	RepositoryPermissionDelete    RepositoryPermission = "delete"
+	RepositoryPermissionSnakeCase RepositoryPermission = "snake_case"
 )
 
-var repositoryPermissionNames = []string{string(RepositoryPermissionRead), string(RepositoryPermissionPush), string(RepositoryPermissionDelEte)}
+var repositoryPermissionNames = []string{string(RepositoryPermissionRead), string(RepositoryPermissionPush), string(RepositoryPermissionDelete), string(RepositoryPermissionSnakeCase)}
 var repositoryPermissionMap = map[string]RepositoryPermission{
-	"del_ete": RepositoryPermissionDelEte,
-	"push":    RepositoryPermissionPush,
-	"read":    RepositoryPermissionRead,
+	"delete":     RepositoryPermissionDelete,
+	"push":       RepositoryPermissionPush,
+	"read":       RepositoryPermissionRead,
+	"snake_case": RepositoryPermissionSnakeCase,
 }
 
 func RepositoryPermissionNames() []string {
@@ -48,7 +50,7 @@ func RepositoryPermissionNames() []string {
 }
 
 func RepositoryPermissionValues() []RepositoryPermission {
-	return []RepositoryPermission{RepositoryPermissionRead, RepositoryPermissionPush, RepositoryPermissionDelEte}
+	return []RepositoryPermission{RepositoryPermissionRead, RepositoryPermissionPush, RepositoryPermissionDelete, RepositoryPermissionSnakeCase}
 }
 
 func ParseRepositoryPermission(s string) (RepositoryPermission, error) {
@@ -352,7 +354,9 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 	case RepositoryPermissionPush:
 		return a.resolver.Repository().HasRole(ctx, actor, RepositoryRoleOwner, resource) ||
 			a.resolver.Repository().HasRole(ctx, actor, RepositoryRoleEditor, resource)
-	case RepositoryPermissionDelEte:
+	case RepositoryPermissionDelete:
+		return a.resolver.Repository().HasRole(ctx, actor, RepositoryRoleOwner, resource)
+	case RepositoryPermissionSnakeCase:
 		return a.resolver.Repository().HasRole(ctx, actor, RepositoryRoleOwner, resource)
 	default:
 		return false
@@ -735,6 +739,6 @@ func (a Authorizer) Authorize(ctx context.Context, actor *models.User, permissio
 	return false
 }
 
-func NewAuthorizer(resolver Resolver) Authorizer {
-	return Authorizer{resolver: resolver}
+func NewAuthorizer(resolver Resolver) *Authorizer {
+	return &Authorizer{resolver: resolver}
 }

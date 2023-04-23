@@ -87,8 +87,8 @@ func generateGlobalAuthorizer(g *Group, actor spec.QualifierSpec, resources []sp
 
 	g.Line()
 
-	g.Func().Id("NewAuthorizer").Params(Id("resolver").Id("Resolver")).Id("Authorizer").Block(
-		Return(Id("Authorizer").Values(Dict{
+	g.Func().Id("NewAuthorizer").Params(Id("resolver").Id("Resolver")).Op("*").Id("Authorizer").Block(
+		Return(Op("&").Id("Authorizer").Values(Dict{
 			Id("resolver"): Id("resolver"),
 		})),
 	)

@@ -11,11 +11,11 @@ resource "repository" {
   // Explicit permissions, this functions both as a 
   // source of truth and a way to create manually 
   // resolved permissions
-  permissions = ["read", "push", "del ete"]
+  permissions = ["read", "push", "delete", "snake_case"]
 
   // Roles are a way to group permissions together
   role "owner" {
-    permissions = ["read", "push", "del ete"]
+    permissions = ["read", "push", "delete", "snake_case"]
   }
 
   role "editor" {
@@ -33,15 +33,11 @@ resource "repository" {
   }
 }
 
-resource "user " {
+resource "user" {
   model = "github.com/endigma/toucan/_examples/basic/models.User"
 
-  // Explicit permissions, this functions both as a 
-  // source of truth and a way to create manually 
-  // resolved permissions
   permissions = ["read", "write", "delete"]
 
-  // Roles are a way to group permissions together
   role "admin" {
     permissions = ["read", "write", "delete"]
   }
@@ -54,8 +50,6 @@ resource "user " {
     permissions = ["read"]
   }
 
-  // Attributes are a way to force a resolver 
-  // for a particular group of permissions
   attribute "public" {
     permissions = ["read"]
   }
