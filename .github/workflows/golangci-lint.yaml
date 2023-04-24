@@ -1,8 +1,12 @@
 name: golangci-lint
+
 on:
-  ["push", "pull_request"]
-  # Optional: allow read access to pull request. Use with `only-new-issues` option.
-  # pull-requests: read
+  push:
+    tags:
+      - v*
+    branches:
+      - main
+  pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
