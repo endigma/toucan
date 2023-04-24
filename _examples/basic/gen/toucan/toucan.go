@@ -726,12 +726,12 @@ func (a Authorizer) Authorize(ctx context.Context, actor *models.User, permissio
 	switch resource.(type) {
 	case *models.Repository:
 		perm, err := ParseRepositoryPermission(permission)
-		if err != nil {
+		if err == nil {
 			return a.AuthorizeRepository(ctx, actor, perm, resource.(*models.Repository))
 		}
 	case *models.User:
 		perm, err := ParseUserPermission(permission)
-		if err != nil {
+		if err == nil {
 			return a.AuthorizeUser(ctx, actor, perm, resource.(*models.User))
 		}
 	}

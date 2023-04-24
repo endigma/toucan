@@ -2,14 +2,14 @@ package codegen
 
 import (
 	. "github.com/dave/jennifer/jen"
-	"github.com/endigma/toucan/spec"
+	"github.com/endigma/toucan/schema"
 	"github.com/samber/lo"
 )
 
-func generateResourceAuthorizer(g *Group, actor spec.QualifierSpec, resource spec.ResourceSpec) error {
-	g.Comment("authorizer for resource `" + resource.Name + "`").Line()
+func generateResourceAuthorizer(group *Group, actor schema.Model, resource schema.ResourceSchema) error {
+	group.Comment("authorizer for resource `" + resource.Name + "`").Line()
 
-	g.Func().
+	group.Func().
 		Params(
 			Id("a").Id("Authorizer"),
 		).
@@ -17,53 +17,52 @@ func generateResourceAuthorizer(g *Group, actor spec.QualifierSpec, resource spe
 		Params(
 			paramsForAuthorizer(actor, resource)...,
 		).Bool().
-		BlockFunc(func(g *Group) {
-			g.If(Op("!").Id("action").Dot("Valid").Call()).Block(
+		BlockFunc(func(group *Group) {
+			group.If(Op("!").Id("action").Dot("Valid").Call()).Block(
 				Return(False()),
 			)
 
-			g.Switch(Id("action")).BlockFunc(func(g *Group) {
+			group.Switch(Id("action")).BlockFunc(func(group *Group) {
 				for _, perm := range resource.Permissions {
 					sources := resource.GetPermissionSources(perm)
 
-					g.Case(Id(pascal(resource.Name) + "Permission" + pascal(perm))).Block(
-						Return(lo.Reduce(sources, func(s *Statement, source spec.PermissionSource, n int) *Statement {
+					group.Case(Id(pascal(resource.Name) + "Permission" + pascal(perm))).Block(
+						Return(lo.Reduce(sources, func(statement *Statement, source schema.PermissionSource, n int) *Statement {
 							resolver, params := CallPermissionSource(source)
 							call := Id("a").Dot("resolver").Dot(pascal(resource.Name)).Call().Dot(resolver).Add(params)
 
 							if n == 0 {
-								return s.Add(call)
+								return statement.Add(call)
 							} else {
-								return s.Op("||").Line().Add(call)
+								return statement.Op("||").Line().Add(call)
 							}
 						}, &Statement{})),
 					)
-
 				}
-				g.Default().Block(Return(False()))
+				group.Default().Block(Return(False()))
 			})
 		})
 
 	return nil
 }
 
-func generateGlobalAuthorizer(g *Group, actor spec.QualifierSpec, resources []spec.ResourceSpec) error {
-	g.Comment("Global authorizer")
-	g.Type().Id("Authorizer").StructFunc(func(g *Group) {
+func generateGlobalAuthorizer(group *Group, actor schema.Model, resources []schema.ResourceSchema) {
+	group.Comment("Global authorizer")
+	group.Type().Id("Authorizer").StructFunc(func(g *Group) {
 		g.Id("resolver").Id("Resolver")
 	})
 
-	g.Func().Params(Id("a").Id("Authorizer")).Id("Authorize").Params(
+	group.Func().Params(Id("a").Id("Authorizer")).Id("Authorize").Params(
 		Id("ctx").Qual("context", "Context"),
 		Id("actor").Op("*").Qual(actor.Path, actor.Name),
 		Id("permission").String(),
 		Id("resource").Any(),
-	).Bool().BlockFunc(func(g *Group) {
-		g.Switch(Id("resource").Assert(Type())).BlockFunc(func(g *Group) {
+	).Bool().BlockFunc(func(group *Group) {
+		group.Switch(Id("resource").Assert(Type())).BlockFunc(func(group *Group) {
 			for _, resource := range resources {
-				g.Case(Op("*").Qual(resource.Model.Path, resource.Model.Name)).Block(
+				group.Case(Op("*").Qual(resource.Model.Tuple())).Block(
 					List(Id("perm"), Id("err")).Op(":=").Id("Parse"+pascal(resource.Name)+"Permission").Call(Id("permission")),
-					If(Id("err").Op("!=").Nil()).Block(
+					If(Id("err").Op("==").Nil()).Block(
 						Return(
 							Id("a").
 								Dot("Authorize"+pascal(resource.Name)).
@@ -82,16 +81,14 @@ func generateGlobalAuthorizer(g *Group, actor spec.QualifierSpec, resources []sp
 			}
 		}).Line()
 
-		g.Return(False())
+		group.Return(False())
 	})
 
-	g.Line()
+	group.Line()
 
-	g.Func().Id("NewAuthorizer").Params(Id("resolver").Id("Resolver")).Op("*").Id("Authorizer").Block(
+	group.Func().Id("NewAuthorizer").Params(Id("resolver").Id("Resolver")).Op("*").Id("Authorizer").Block(
 		Return(Op("&").Id("Authorizer").Values(Dict{
 			Id("resolver"): Id("resolver"),
 		})),
 	)
-
-	return nil
 }

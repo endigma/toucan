@@ -2,27 +2,27 @@ package codegen
 
 import (
 	"github.com/dave/jennifer/jen"
-	"github.com/endigma/toucan/spec"
+	"github.com/endigma/toucan/schema"
 	"github.com/iancoleman/strcase"
 )
 
 // String to lowerCamelCase
-// technically a misnomer, but it's simpler to remember
+// technically a misnomer, but it's simpler to remember.
 func camel(s string) string {
 	return strcase.ToLowerCamel(s)
 }
 
-// String to snake_case
+// String to snake_case.
 func snake(s string) string {
 	return strcase.ToSnake(s)
 }
 
-// String to PascalCase
+// String to PascalCase.
 func pascal(s string) string {
 	return strcase.ToCamel(s)
 }
 
-func paramsForAuthorizer(actor spec.QualifierSpec, resource spec.ResourceSpec) []jen.Code {
+func paramsForAuthorizer(actor schema.Model, resource schema.ResourceSchema) []jen.Code {
 	return []jen.Code{
 		jen.Id("ctx").Qual("context", "Context"),
 		jen.Id("actor").Op("*").Qual(actor.Path, actor.Name),
@@ -31,7 +31,7 @@ func paramsForAuthorizer(actor spec.QualifierSpec, resource spec.ResourceSpec) [
 	}
 }
 
-func CallPermissionSource(source spec.PermissionSource) (string, *jen.Statement) {
+func CallPermissionSource(source schema.PermissionSource) (string, *jen.Statement) {
 	switch source.Type {
 	case "role":
 		return "HasRole", jen.Call(jen.Id("ctx"), jen.Id("actor"), jen.Id(source.Name), jen.Id("resource"))
@@ -40,6 +40,4 @@ func CallPermissionSource(source spec.PermissionSource) (string, *jen.Statement)
 	}
 
 	return "", jen.Null()
-
-	// return Call(Id(source.CallName()), source.CallParams())
 }

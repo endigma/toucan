@@ -2,14 +2,14 @@ package codegen
 
 import (
 	. "github.com/dave/jennifer/jen"
-	"github.com/endigma/toucan/spec"
+	"github.com/endigma/toucan/schema"
 	"github.com/samber/lo"
 )
 
-func generateResourceTypes(g *Group, resource spec.ResourceSpec) error {
+func generateResourceTypes(group *Group, resource schema.ResourceSchema) error {
 	// Generate permissions enum
 	if len(resource.Permissions) > 0 {
-		err := generateStringEnum(g, resource.Name+"Permission", resource.Permissions)
+		err := generateStringEnum(group, resource.Name+"Permission", resource.Permissions)
 		if err != nil {
 			return err
 		}
@@ -17,9 +17,12 @@ func generateResourceTypes(g *Group, resource spec.ResourceSpec) error {
 
 	// Generate roles enum
 	if len(resource.Roles) > 0 {
-		err := generateStringEnum(g, resource.Name+"Role", lo.Map(resource.Roles, func(role spec.RoleSpec, _ int) string {
-			return role.Name
-		}))
+		err := generateStringEnum(
+			group,
+			resource.Name+"Role",
+			lo.Map(resource.Roles, func(role schema.RoleSchema, _ int) string {
+				return role.Name
+			}))
 		if err != nil {
 			return err
 		}
@@ -27,9 +30,11 @@ func generateResourceTypes(g *Group, resource spec.ResourceSpec) error {
 
 	// Generate attributes enum
 	if len(resource.Attributes) > 0 {
-		err := generateStringEnum(g, resource.Name+"Attribute", lo.Map(resource.Attributes, func(attribute spec.AttributeSpec, _ int) string {
-			return attribute.Name
-		}))
+		err := generateStringEnum(group,
+			resource.Name+"Attribute",
+			lo.Map(resource.Attributes, func(attribute schema.AttributeSchema, _ int) string {
+				return attribute.Name
+			}))
 		if err != nil {
 			return err
 		}
@@ -38,7 +43,7 @@ func generateResourceTypes(g *Group, resource spec.ResourceSpec) error {
 	return nil
 }
 
-func generateStringEnum(g *Group, name string, values []string) error {
+func generateStringEnum(group *Group, name string, values []string) error {
 	enumName := pascal(name)
 	parserName := "Parse" + enumName
 	namesFunc := enumName + "Names"
@@ -48,23 +53,18 @@ func generateStringEnum(g *Group, name string, values []string) error {
 	errInvalid := "ErrInvalid" + enumName
 	errNil := "ErrNil" + enumName
 
-	g.Comment("Enum " + enumName)
+	group.Comment("Enum " + enumName)
 
-	g.Type().Id(enumName).String()
+	group.Type().Id(enumName).String()
 
 	// ToString helper
-	g.Func().Params(Id("s").Id(enumName)).Id("String").Params().String().Block(
-		Return(String().Parens(Id("s"))),
-	).Line()
+	generateToStringHelper(group, enumName)
 
 	// Valid helper
-	g.Func().Params(Id("s").Id(enumName)).Id("Valid").Params().Bool().Block(
-		List(Id("_"), Id("err")).Op(":=").Id(parserName).Call(String().Parens(Id("s"))),
-		Return(Id("err").Op("==").Nil()),
-	).Line()
+	generateValidHelper(group, enumName, parserName)
 
 	// Invalid value error
-	g.Var().
+	group.Var().
 		Id(errInvalid).
 		Op("=").
 		Qual("fmt", "Errorf").
@@ -75,7 +75,7 @@ func generateStringEnum(g *Group, name string, values []string) error {
 		)
 
 	// Null ptr error
-	g.Var().
+	group.Var().
 		Id(errNil).
 		Op("=").
 		Qual("errors", "New").
@@ -84,42 +84,42 @@ func generateStringEnum(g *Group, name string, values []string) error {
 		)
 
 	// Constants
-	g.Const().DefsFunc(func(g *Group) {
+	group.Const().DefsFunc(func(group *Group) {
 		for _, value := range values {
-			g.Id(enumName + pascal(value)).Id(pascal(name)).Op("=").Lit(snake(value))
+			group.Id(enumName + pascal(value)).Id(pascal(name)).Op("=").Lit(snake(value))
 		}
 	})
 
 	// Names array and map
-	g.Var().Id(namesArray).Op("=").Index().String().ValuesFunc(func(g *Group) {
+	group.Var().Id(namesArray).Op("=").Index().String().ValuesFunc(func(group *Group) {
 		for _, value := range values {
-			g.String().Parens(Id(enumName + pascal(value)))
+			group.String().Parens(Id(enumName + pascal(value)))
 		}
 	})
 
-	g.Var().Id(namesMap).Op("=").Map(String()).Id(enumName).Values(DictFunc(func(d Dict) {
+	group.Var().Id(namesMap).Op("=").Map(String()).Id(enumName).Values(DictFunc(func(d Dict) {
 		for _, value := range values {
 			d[Lit(snake(value))] = Id(enumName + pascal(value))
 		}
 	}))
 
 	// Names and Values functions
-	g.Func().Id(namesFunc).Params().Index().String().Block(
+	group.Func().Id(namesFunc).Params().Index().String().Block(
 		Id("tmp").Op(":=").Make(Index().String(), Len(Id(namesArray))),
 		Copy(Id("tmp"), Id(namesArray)),
 		Return(Id("tmp")),
 	).Line()
 
-	g.Func().Id(valuesFunc).Params().Index().Id(enumName).Block(
-		Return(Index().Id(enumName).ValuesFunc(func(g *Group) {
+	group.Func().Id(valuesFunc).Params().Index().Id(enumName).Block(
+		Return(Index().Id(enumName).ValuesFunc(func(group *Group) {
 			for _, value := range values {
-				g.Id(enumName + pascal(value))
+				group.Id(enumName + pascal(value))
 			}
 		})),
 	).Line()
 
 	// Parsing
-	g.Func().Id(parserName).Params(Id("s").String()).Params(Id(enumName), Error()).Block(
+	group.Func().Id(parserName).Params(Id("s").String()).Params(Id(enumName), Error()).Block(
 		If(
 			List(Id("x"), Id("ok")).Op(":=").Id(namesMap).Index(Id("s")),
 			Id("ok"),
@@ -136,7 +136,7 @@ func generateStringEnum(g *Group, name string, values []string) error {
 		),
 	).Line()
 
-	g.Func().Id("MustParse"+enumName).Params(Id("s").String()).Id(enumName).Block(
+	group.Func().Id("MustParse"+enumName).Params(Id("s").String()).Id(enumName).Block(
 		List(Id("x"), Id("err")).Op(":=").Id(parserName).Call(Id("s")),
 		If(Id("err").Op("!=").Nil()).Block(
 			Panic(Id("err")),
@@ -146,11 +146,11 @@ func generateStringEnum(g *Group, name string, values []string) error {
 	).Line()
 
 	// Text marshalling
-	g.Func().Params(Id("s").Id(enumName)).Id("MarshalText").Params().Params(Index().Byte(), Error()).Block(
+	group.Func().Params(Id("s").Id(enumName)).Id("MarshalText").Params().Params(Index().Byte(), Error()).Block(
 		Return(Index().Byte().Parens(String().Parens(Id("s"))), Nil()),
 	).Line()
 
-	g.Func().Params(Id("s").Op("*").Id(enumName)).Id("UnmarshalText").Params(Id("data").Index().Byte()).Error().Block(
+	group.Func().Params(Id("s").Op("*").Id(enumName)).Id("UnmarshalText").Params(Id("data").Index().Byte()).Error().Block(
 		List(Id("x"), Id("err")).Op(":=").Id(parserName).Call(String().Parens(Id("data"))),
 		If(Id("err").Op("!=").Nil()).Block(
 			Return(Id("err")),
@@ -161,7 +161,7 @@ func generateStringEnum(g *Group, name string, values []string) error {
 	).Line()
 
 	// Scanner interface
-	g.Func().Params(Id("s").Op("*").Id(enumName)).Id("Scan").Params(Id("value").Any()).Params(Id("err").Error()).Block(
+	group.Func().Params(Id("s").Op("*").Id(enumName)).Id("Scan").Params(Id("value").Any()).Params(Id("err").Error()).Block(
 		If(Id("value").Op("==").Nil()).Block(
 			Op("*").Id("s").Op("=").Id(enumName).Call(Lit("")),
 			Return(Nil()),
@@ -197,9 +197,36 @@ func generateStringEnum(g *Group, name string, values []string) error {
 	).Line()
 
 	// Valuer interface
-	g.Func().Params(Id("s").Id(enumName)).Id("Value").Params().Params(Qual("database/sql/driver", "Value"), Error()).Block(
-		Return(String().Parens(Id("s")), Nil()),
+	group.Func().
+		Params(Id("s").
+			Id(enumName),
+		).
+		Id("Value").
+		Params().
+		Params(
+			Qual("database/sql/driver", "Value"),
+			Error(),
+		).Block(
+		Return(
+			String().
+				Parens(
+					Id("s"),
+				), Nil(),
+		),
 	)
 
 	return nil
+}
+
+func generateValidHelper(group *Group, enumName string, parserName string) {
+	group.Func().Params(Id("s").Id(enumName)).Id("Valid").Params().Bool().Block(
+		List(Id("_"), Id("err")).Op(":=").Id(parserName).Call(String().Parens(Id("s"))),
+		Return(Id("err").Op("==").Nil()),
+	).Line()
+}
+
+func generateToStringHelper(group *Group, enumName string) {
+	group.Func().Params(Id("s").Id(enumName)).Id("String").Params().String().Block(
+		Return(String().Parens(Id("s"))),
+	).Line()
 }

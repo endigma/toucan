@@ -2,17 +2,17 @@ package codegen
 
 import (
 	. "github.com/dave/jennifer/jen"
-	"github.com/endigma/toucan/spec"
+	"github.com/endigma/toucan/schema"
 )
 
-func generateResourceResolver(g *Group, actor spec.QualifierSpec, resource spec.ResourceSpec) error {
-	g.Comment("Resolver for resource `" + resource.Name + "`")
+func generateResourceResolver(group *Group, actor schema.Model, resource schema.ResourceSchema) error {
+	group.Comment("Resolver for resource `" + resource.Name + "`")
 
 	// Generate resolver interface
-	g.Type().Id(pascal(resource.Name) + "Resolver").InterfaceFunc(func(g *Group) {
+	group.Type().Id(pascal(resource.Name) + "Resolver").InterfaceFunc(func(group *Group) {
 		// Role resolver
 		if len(resource.Roles) > 0 {
-			g.Id("HasRole").Params(
+			group.Id("HasRole").Params(
 				Id("context").Qual("context", "Context"),
 				Id("actor").Op("*").Qual(actor.Path, actor.Name),
 				Id("role").Id(pascal(resource.Name+"Role")),
@@ -22,7 +22,7 @@ func generateResourceResolver(g *Group, actor spec.QualifierSpec, resource spec.
 
 		// Attribute resolver
 		if len(resource.Attributes) > 0 {
-			g.Id("HasAttribute").Params(
+			group.Id("HasAttribute").Params(
 				Id("context").Qual("context", "Context"),
 				Id("attribute").Id(pascal(resource.Name+"Attribute")),
 				Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name),
@@ -33,13 +33,11 @@ func generateResourceResolver(g *Group, actor spec.QualifierSpec, resource spec.
 	return nil
 }
 
-func generateGlobalResolver(g *Group, actor spec.QualifierSpec, resources []spec.ResourceSpec) error {
-	g.Comment("Global resolver")
-	g.Type().Id("Resolver").InterfaceFunc(func(g *Group) {
+func generateGlobalResolver(group *Group, resources []schema.ResourceSchema) {
+	group.Comment("Global resolver")
+	group.Type().Id("Resolver").InterfaceFunc(func(group *Group) {
 		for _, resource := range resources {
-			g.Id(pascal(resource.Name)).Params().Id(pascal(resource.Name) + "Resolver")
+			group.Id(pascal(resource.Name)).Params().Id(pascal(resource.Name) + "Resolver")
 		}
 	})
-
-	return nil
 }
