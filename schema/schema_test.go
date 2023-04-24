@@ -8,12 +8,10 @@ import (
 )
 
 //nolint:funlen
-func TestSpec(t *testing.T) {
+func TestSchema(t *testing.T) {
 	t.Parallel()
 
 	t.Run("valid", func(t *testing.T) {
-		t.Parallel()
-
 		schema := schema.Schema{
 			Actor: schema.Model{"github.com/endigma/toucan/_examples/basic", "User"},
 			Resources: []schema.ResourceSchema{
@@ -35,8 +33,6 @@ func TestSpec(t *testing.T) {
 	})
 
 	t.Run("invalid names", func(t *testing.T) {
-		t.Parallel()
-
 		schema := schema.Schema{
 			Actor: schema.Model{"github.com/endigma/toucan/_examples/basic", "user"},
 			Resources: []schema.ResourceSchema{
@@ -58,8 +54,6 @@ func TestSpec(t *testing.T) {
 	})
 
 	t.Run("invalid paths", func(t *testing.T) {
-		t.Parallel()
-
 		schema := schema.Schema{
 			Actor: schema.Model{"asdasd343//112.$asd", "User"},
 			Resources: []schema.ResourceSchema{
@@ -81,8 +75,6 @@ func TestSpec(t *testing.T) {
 	})
 
 	t.Run("duplicate resource names", func(t *testing.T) {
-		t.Parallel()
-
 		resource := schema.ResourceSchema{
 			Name:        "Post",
 			Model:       schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
@@ -107,8 +99,6 @@ func TestSpec(t *testing.T) {
 	})
 
 	t.Run("duplicate role names", func(t *testing.T) {
-		t.Parallel()
-
 		role := schema.RoleSchema{
 			Name:        "admin",
 			Permissions: []string{"read", "write"},
@@ -130,8 +120,6 @@ func TestSpec(t *testing.T) {
 	})
 
 	t.Run("duplicate attribute names", func(t *testing.T) {
-		t.Parallel()
-
 		attr := schema.AttributeSchema{
 			Name:        "Attribute",
 			Permissions: []string{"read", "write"},
@@ -153,8 +141,6 @@ func TestSpec(t *testing.T) {
 	})
 
 	t.Run("duplicate permission names", func(t *testing.T) {
-		t.Parallel()
-
 		schema := schema.Schema{
 			Actor: schema.Model{"github.com/endigma/toucan/_examples/basic", "User"},
 			Resources: []schema.ResourceSchema{
@@ -170,8 +156,6 @@ func TestSpec(t *testing.T) {
 	})
 
 	t.Run("unmatched permissions", func(t *testing.T) {
-		t.Parallel()
-
 		schema := schema.Schema{
 			Actor: schema.Model{"github.com/endigma/toucan/_examples/basic", "User"},
 			Resources: []schema.ResourceSchema{
@@ -193,8 +177,6 @@ func TestSpec(t *testing.T) {
 	})
 
 	t.Run("unmatched permissions", func(t *testing.T) {
-		t.Parallel()
-
 		schema := schema.Schema{
 			Actor: schema.Model{"github.com/endigma/toucan/_examples/basic", "User"},
 			Resources: []schema.ResourceSchema{
@@ -216,8 +198,6 @@ func TestSpec(t *testing.T) {
 	})
 
 	t.Run("reserved names", func(t *testing.T) {
-		t.Parallel()
-
 		schema := schema.Schema{
 			Actor: schema.Model{"github.com/endigma/toucan/_examples/basic", "User"},
 			Resources: []schema.ResourceSchema{
@@ -232,8 +212,6 @@ func TestSpec(t *testing.T) {
 	})
 
 	t.Run("role with no perms", func(t *testing.T) {
-		t.Parallel()
-
 		schema := schema.Schema{
 			Actor: schema.Model{"github.com/endigma/toucan/_examples/basic", "User"},
 			Resources: []schema.ResourceSchema{
@@ -253,8 +231,6 @@ func TestSpec(t *testing.T) {
 	})
 
 	t.Run("attribute with no perms", func(t *testing.T) {
-		t.Parallel()
-
 		schema := schema.Schema{
 			Actor: schema.Model{"github.com/endigma/toucan/_examples/basic", "User"},
 			Resources: []schema.ResourceSchema{

@@ -1,26 +1,70 @@
 linters:
-  presets:
-    - bugs
-    - comment
-    - complexity
-    - error
-    - format
-    - import
-    - metalinter
-    - module
-    - performance
-    - sql
-    - style
-    - test
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
     - unused
+    - revive
+    - asasalint
+    - containedctx
+    - contextcheck
+    - cyclop
+    - decorder
+    - dogsled
+    - dupl
+    - durationcheck
+    - dupword
+    - errname
+    - errorlint
+    - exhaustive
+    - exportloopref
+    - funlen
+    - gci
+    - gocheckcompilerdirectives
+    - gochecknoglobals
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - godot
+    - godox
+    - goerr113
+    - gofumpt
+    - gomnd
+    - goprintffuncname
+    - gosec
+    - importas
+    - ireturn
+    - lll
+    - interfacebloat
+    - misspell
+    - musttag
+    - nestif
+    - nilnil
+    - nlreturn
+    - nolintlint
+    - nonamedreturns
+    - prealloc
+    - predeclared
+    - reassign
+    - tenv
+    - testpackage
+    - thelper
+    - testableexamples
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - varnamelen
+    - wastedassign
+    - wrapcheck
+    - wsl
 linters-settings:
   revive:
     rules:
       - name: dot-imports
         disabled: true
-  stylecheck:
-    dot-import-whitelist:
-      - github.com/dave/jennifer/jen
   wrapcheck:
     ignoreSigs:
       - .Errorf(
