@@ -7,41 +7,75 @@ import (
 )
 
 func generateResourceAuthorizer(group *Group, actor schema.Model, resource schema.ResourceSchema) error {
-	group.Comment("authorizer for resource `" + resource.Name + "`").Line()
+	group.Comment("Authorizer for resource `" + resource.Name + "`")
 
 	group.Func().
 		Params(
 			Id("a").Id("Authorizer"),
 		).
-		Id("Authorize" + pascal(resource.Name)).
+		Id("Authorize"+pascal(resource.Name)).
 		Params(
 			paramsForAuthorizer(actor, resource)...,
 		).Bool().
-		BlockFunc(func(group *Group) {
-			group.If(Op("!").Id("action").Dot("Valid").Call()).Block(
+		Block(
+			Id("resolver").Op(":=").Id("a").Dot("resolver").Dot(pascal(resource.Name)).Call().Line(),
+
+			If(Op("!").Id("action").Dot("Valid").Call()).Block(
 				Return(False()),
-			)
+			).Line(),
 
-			group.Switch(Id("action")).BlockFunc(func(group *Group) {
-				for _, perm := range resource.Permissions {
-					sources := resource.GetPermissionSources(perm)
+			If(Id("resource").Op("!=").Nil()).Block(
+				Switch(Id("action")).BlockFunc(func(group *Group) {
+					for _, permission := range resource.Permissions {
+						sources := resource.GetAttributeSources(permission)
 
-					group.Case(Id(pascal(resource.Name) + "Permission" + pascal(perm))).Block(
-						Return(lo.Reduce(sources, func(statement *Statement, source schema.PermissionSource, n int) *Statement {
-							resolver, params := CallPermissionSource(source)
-							call := Id("a").Dot("resolver").Dot(pascal(resource.Name)).Call().Dot(resolver).Add(params)
+						if len(sources) == 0 {
+							continue
+						}
 
-							if n == 0 {
-								return statement.Add(call)
-							} else {
-								return statement.Op("||").Line().Add(call)
-							}
-						}, &Statement{})),
-					)
-				}
-				group.Default().Block(Return(False()))
-			})
-		})
+						group.Case(Id(pascal(resource.Name) + "Permission" + pascal(permission))).Block(
+							If(lo.Reduce(sources, func(statement *Statement, source schema.PermissionSource, number int) *Statement {
+								resolver, params := CallPermissionSource(source)
+
+								call := Id("resolver").Dot(resolver).Add(params)
+
+								if number == 0 {
+									return statement.Add(call)
+								} else {
+									return statement.Op("||").Line().Add(call)
+								}
+							}, &Statement{})).Block(
+								Return(True()),
+							),
+						)
+					}
+				}),
+			).Line(),
+
+			If(Id("resource").Op("!=").Nil().Op("&&").Id("actor").Op("!=").Nil()).Block(
+				Switch(Id("action")).BlockFunc(func(group *Group) {
+					for _, perm := range resource.Permissions {
+						sources := resource.GetRoleSources(perm)
+
+						group.Case(Id(pascal(resource.Name) + "Permission" + pascal(perm))).Block(
+							Return(lo.Reduce(sources, func(statement *Statement, source schema.PermissionSource, number int) *Statement {
+								resolver, params := CallPermissionSource(source)
+
+								call := Id("resolver").Dot(resolver).Add(params)
+
+								if number == 0 {
+									return statement.Add(call)
+								} else {
+									return statement.Op("||").Line().Add(call)
+								}
+							}, &Statement{})),
+						)
+					}
+				}),
+			).Line(),
+
+			Return(False()),
+		)
 
 	return nil
 }

@@ -34,9 +34,9 @@ func paramsForAuthorizer(actor schema.Model, resource schema.ResourceSchema) []j
 func CallPermissionSource(source schema.PermissionSource) (string, *jen.Statement) {
 	switch source.Type {
 	case "role":
-		return "HasRole", jen.Call(jen.Id("ctx"), jen.Id("actor"), jen.Id(source.Name), jen.Id("resource"))
+		return "HasRole" + pascal(source.Name), jen.Call(jen.Id("ctx"), jen.Id("actor"), jen.Id("resource"))
 	case "attribute":
-		return "HasAttribute", jen.Call(jen.Id("ctx"), jen.Id(source.Name), jen.Id("resource"))
+		return "HasAttribute" + pascal(source.Name), jen.Call(jen.Id("ctx"), jen.Id("resource"))
 	}
 
 	return "", jen.Null()

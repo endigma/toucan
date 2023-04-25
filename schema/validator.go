@@ -140,7 +140,13 @@ func notReservedValidator(fieldLevel validator.FieldLevel) bool {
 		return false
 	}
 
-	return !lo.Contains([]string{"resolver", "authorizer"}, strcase.ToLowerCamel(field.String()))
+	return !lo.Contains([]string{
+		"resolver",
+		"authorizer",
+		"role",
+		"resource",
+		"actor",
+	}, strcase.ToLowerCamel(field.String()))
 }
 
 func nameValidator(fieldLevel validator.FieldLevel) bool {

@@ -3,7 +3,6 @@ package codegen
 import (
 	. "github.com/dave/jennifer/jen"
 	"github.com/endigma/toucan/schema"
-	"github.com/samber/lo"
 )
 
 func generateResourceTypes(group *Group, resource schema.ResourceSchema) error {
@@ -16,29 +15,29 @@ func generateResourceTypes(group *Group, resource schema.ResourceSchema) error {
 	}
 
 	// Generate roles enum
-	if len(resource.Roles) > 0 {
-		err := generateStringEnum(
-			group,
-			resource.Name+"Role",
-			lo.Map(resource.Roles, func(role schema.RoleSchema, _ int) string {
-				return role.Name
-			}))
-		if err != nil {
-			return err
-		}
-	}
+	// if len(resource.Roles) > 0 {
+	// 	err := generateStringEnum(
+	// 		group,
+	// 		resource.Name+"Role",
+	// 		lo.Map(resource.Roles, func(role schema.RoleSchema, _ int) string {
+	// 			return role.Name
+	// 		}))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	// Generate attributes enum
-	if len(resource.Attributes) > 0 {
-		err := generateStringEnum(group,
-			resource.Name+"Attribute",
-			lo.Map(resource.Attributes, func(attribute schema.AttributeSchema, _ int) string {
-				return attribute.Name
-			}))
-		if err != nil {
-			return err
-		}
-	}
+	// if len(resource.Attributes) > 0 {
+	// 	err := generateStringEnum(group,
+	// 		resource.Name+"Attribute",
+	// 		lo.Map(resource.Attributes, func(attribute schema.AttributeSchema, _ int) string {
+	// 			return attribute.Name
+	// 		}))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	return nil
 }
@@ -46,8 +45,8 @@ func generateResourceTypes(group *Group, resource schema.ResourceSchema) error {
 func generateStringEnum(group *Group, name string, values []string) error {
 	enumName := pascal(name)
 	parserName := "Parse" + enumName
-	namesFunc := enumName + "Names"
-	valuesFunc := enumName + "Values"
+	// namesFunc := enumName + "Names"
+	// valuesFunc := enumName + "Values"
 	namesArray := camel(name) + "Names"
 	namesMap := camel(name) + "Map"
 	errInvalid := "ErrInvalid" + enumName
@@ -57,32 +56,6 @@ func generateStringEnum(group *Group, name string, values []string) error {
 
 	group.Type().Id(enumName).String()
 
-	// ToString helper
-	generateToStringHelper(group, enumName)
-
-	// Valid helper
-	generateValidHelper(group, enumName, parserName)
-
-	// Invalid value error
-	group.Var().
-		Id(errInvalid).
-		Op("=").
-		Qual("fmt", "Errorf").
-		Call(
-			Lit("not a valid "+name+", try [%s]"),
-			Qual("strings", "Join").
-				Call(Id(namesArray), Lit(", ")),
-		)
-
-	// Null ptr error
-	group.Var().
-		Id(errNil).
-		Op("=").
-		Qual("errors", "New").
-		Call(
-			Lit("value is nil"),
-		)
-
 	// Constants
 	group.Const().DefsFunc(func(group *Group) {
 		for _, value := range values {
@@ -90,33 +63,66 @@ func generateStringEnum(group *Group, name string, values []string) error {
 		}
 	})
 
-	// Names array and map
-	group.Var().Id(namesArray).Op("=").Index().String().ValuesFunc(func(group *Group) {
-		for _, value := range values {
-			group.String().Parens(Id(enumName + pascal(value)))
-		}
-	})
+	// ToString helper
+	generateToStringHelper(group, enumName)
 
-	group.Var().Id(namesMap).Op("=").Map(String()).Id(enumName).Values(DictFunc(func(d Dict) {
-		for _, value := range values {
-			d[Lit(snake(value))] = Id(enumName + pascal(value))
-		}
-	}))
+	// Valid helper
+	generateValidHelper(group, enumName, parserName)
 
-	// Names and Values functions
-	group.Func().Id(namesFunc).Params().Index().String().Block(
-		Id("tmp").Op(":=").Make(Index().String(), Len(Id(namesArray))),
-		Copy(Id("tmp"), Id(namesArray)),
-		Return(Id("tmp")),
-	).Line()
+	group.Var().Defs(
+		Id(errInvalid).
+			Op("=").
+			Qual("fmt", "Errorf").
+			Call(
+				Lit("not a valid "+name+", try [%s]"),
+				Qual("strings", "Join").
+					Call(Id(namesArray), Lit(", ")),
+			),
+		Id(errNil).
+			Op("=").
+			Qual("errors", "New").
+			Call(
+				Lit("value is nil"),
+			),
+	)
 
-	group.Func().Id(valuesFunc).Params().Index().Id(enumName).Block(
-		Return(Index().Id(enumName).ValuesFunc(func(group *Group) {
+	group.Line()
+
+	group.Var().Defs(
+		Id(namesMap).Op("=").Map(String()).Id(enumName).Values(DictFunc(func(d Dict) {
 			for _, value := range values {
-				group.Id(enumName + pascal(value))
+				d[Lit(snake(value))] = Id(enumName + pascal(value))
 			}
 		})),
-	).Line()
+		Id(namesArray).Op("=").Index().String().ValuesFunc(func(group *Group) {
+			for _, value := range values {
+				group.String().Parens(Id(enumName + pascal(value)))
+			}
+		}),
+	)
+
+	// Invalid value error
+	// group.Var().
+
+	// Null ptr error
+	// group.Var().
+
+	// Names array and map
+	// group.Var().
+	// Names and Values functions
+	// group.Func().Id(namesFunc).Params().Index().String().Block(
+	// 	Id("tmp").Op(":=").Make(Index().String(), Len(Id(namesArray))),
+	// 	Copy(Id("tmp"), Id(namesArray)),
+	// 	Return(Id("tmp")),
+	// ).Line()
+
+	// group.Func().Id(valuesFunc).Params().Index().Id(enumName).Block(
+	// 	Return(Index().Id(enumName).ValuesFunc(func(group *Group) {
+	// 		for _, value := range values {
+	// 			group.Id(enumName + pascal(value))
+	// 		}
+	// 	})),
+	// ).Line()
 
 	// Parsing
 	group.Func().Id(parserName).Params(Id("s").String()).Params(Id(enumName), Error()).Block(
@@ -136,84 +142,84 @@ func generateStringEnum(group *Group, name string, values []string) error {
 		),
 	).Line()
 
-	group.Func().Id("MustParse"+enumName).Params(Id("s").String()).Id(enumName).Block(
-		List(Id("x"), Id("err")).Op(":=").Id(parserName).Call(Id("s")),
-		If(Id("err").Op("!=").Nil()).Block(
-			Panic(Id("err")),
-		),
-		Line(),
-		Return(Id("x")),
-	).Line()
+	// group.Func().Id("MustParse"+enumName).Params(Id("s").String()).Id(enumName).Block(
+	// 	List(Id("x"), Id("err")).Op(":=").Id(parserName).Call(Id("s")),
+	// 	If(Id("err").Op("!=").Nil()).Block(
+	// 		Panic(Id("err")),
+	// 	),
+	// 	Line(),
+	// 	Return(Id("x")),
+	// ).Line()
 
 	// Text marshalling
-	group.Func().Params(Id("s").Id(enumName)).Id("MarshalText").Params().Params(Index().Byte(), Error()).Block(
-		Return(Index().Byte().Parens(String().Parens(Id("s"))), Nil()),
-	).Line()
+	// group.Func().Params(Id("s").Id(enumName)).Id("MarshalText").Params().Params(Index().Byte(), Error()).Block(
+	// 	Return(Index().Byte().Parens(String().Parens(Id("s"))), Nil()),
+	// ).Line()
 
-	group.Func().Params(Id("s").Op("*").Id(enumName)).Id("UnmarshalText").Params(Id("data").Index().Byte()).Error().Block(
-		List(Id("x"), Id("err")).Op(":=").Id(parserName).Call(String().Parens(Id("data"))),
-		If(Id("err").Op("!=").Nil()).Block(
-			Return(Id("err")),
-		),
-		Line(),
-		Id("*s").Op("=").Id("x"),
-		Return(Nil()),
-	).Line()
+	// group.Func().Params(Id("s").Op("*").Id(enumName)).Id("UnmarshalText").Params(Id("data").Index().Byte()).Error().Block(
+	// 	List(Id("x"), Id("err")).Op(":=").Id(parserName).Call(String().Parens(Id("data"))),
+	// 	If(Id("err").Op("!=").Nil()).Block(
+	// 		Return(Id("err")),
+	// 	),
+	// 	Line(),
+	// 	Id("*s").Op("=").Id("x"),
+	// 	Return(Nil()),
+	// ).Line()
 
 	// Scanner interface
-	group.Func().Params(Id("s").Op("*").Id(enumName)).Id("Scan").Params(Id("value").Any()).Params(Id("err").Error()).Block(
-		If(Id("value").Op("==").Nil()).Block(
-			Op("*").Id("s").Op("=").Id(enumName).Call(Lit("")),
-			Return(Nil()),
-		).Line(),
+	// group.Func().Params(Id("s").Op("*").Id(enumName)).Id("Scan").Params(Id("value").Any()).Params(Id("err").Error()).Block(
+	// 	If(Id("value").Op("==").Nil()).Block(
+	// 		Op("*").Id("s").Op("=").Id(enumName).Call(Lit("")),
+	// 		Return(Nil()),
+	// 	).Line(),
 
-		Switch(Id("v").Op(":=").Id("value").Assert(Type())).Block(
-			Case(Id("string")).Block(
-				List(Op("*").Id("s"), Id("err")).Op("=").Id(parserName).Call(Id("v")),
-			),
-			Case(Id("[]byte")).Block(
-				List(Op("*").Id("s"), Id("err")).Op("=").Id(parserName).Call(String().Parens(Id("v"))),
-			),
-			Case(Id(enumName)).Block(
-				Op("*").Id("s").Op("=").Id("v"),
-			),
-			Case(Op("*").Id(enumName)).Block(
-				If(Id("v").Op("==").Nil()).Block(
-					Return(Id("")),
-				),
-				Id("*s").Op("=").Op("*").Id("v"),
-			),
-			Case(Op("*").String()).Block(
-				If(Id("v").Op("==").Nil()).Block(
-					Return(Id("")),
-				),
-				List(Op("*").Id("s"), Id("err")).Op("=").Id(parserName).Call(Op("*").Id("v")),
-			),
-			Default().Block(
-				Return(Qual("errors", "New").Call(Lit("invalid type for "+enumName))),
-			),
-		),
-		Line().Return(),
-	).Line()
+	// 	Switch(Id("v").Op(":=").Id("value").Assert(Type())).Block(
+	// 		Case(Id("string")).Block(
+	// 			List(Op("*").Id("s"), Id("err")).Op("=").Id(parserName).Call(Id("v")),
+	// 		),
+	// 		Case(Id("[]byte")).Block(
+	// 			List(Op("*").Id("s"), Id("err")).Op("=").Id(parserName).Call(String().Parens(Id("v"))),
+	// 		),
+	// 		Case(Id(enumName)).Block(
+	// 			Op("*").Id("s").Op("=").Id("v"),
+	// 		),
+	// 		Case(Op("*").Id(enumName)).Block(
+	// 			If(Id("v").Op("==").Nil()).Block(
+	// 				Return(Id("")),
+	// 			),
+	// 			Id("*s").Op("=").Op("*").Id("v"),
+	// 		),
+	// 		Case(Op("*").String()).Block(
+	// 			If(Id("v").Op("==").Nil()).Block(
+	// 				Return(Id("")),
+	// 			),
+	// 			List(Op("*").Id("s"), Id("err")).Op("=").Id(parserName).Call(Op("*").Id("v")),
+	// 		),
+	// 		Default().Block(
+	// 			Return(Qual("errors", "New").Call(Lit("invalid type for "+enumName))),
+	// 		),
+	// 	),
+	// 	Line().Return(),
+	// ).Line()
 
 	// Valuer interface
-	group.Func().
-		Params(Id("s").
-			Id(enumName),
-		).
-		Id("Value").
-		Params().
-		Params(
-			Qual("database/sql/driver", "Value"),
-			Error(),
-		).Block(
-		Return(
-			String().
-				Parens(
-					Id("s"),
-				), Nil(),
-		),
-	)
+	// group.Func().
+	// 	Params(Id("s").
+	// 		Id(enumName),
+	// 	).
+	// 	Id("Value").
+	// 	Params().
+	// 	Params(
+	// 		Qual("database/sql/driver", "Value"),
+	// 		Error(),
+	// 	).Block(
+	// 	Return(
+	// 		String().
+	// 			Parens(
+	// 				Id("s"),
+	// 			), Nil(),
+	// 	),
+	// )
 
 	return nil
 }
