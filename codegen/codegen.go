@@ -3,6 +3,7 @@ package codegen
 import (
 	"fmt"
 	"log"
+	"path/filepath"
 
 	. "github.com/dave/jennifer/jen"
 	"github.com/endigma/toucan/schema"
@@ -40,7 +41,7 @@ func (gen *Generator) Generate() error {
 	// Generate global authorizer
 	generateGlobalAuthorizer(outFile.Group, gen.Schema.Actor, gen.Schema.Resources)
 
-	err := outFile.Save(gen.Output.Path + gen.Output.Package + ".go")
+	err := outFile.Save(filepath.Join(gen.Output.Path, gen.Output.Package+".go"))
 	if err != nil {
 		return fmt.Errorf("failed to save file: %w", err)
 	}

@@ -9,6 +9,7 @@ require (
 	github.com/go-playground/validator/v10 v10.12.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/iancoleman/strcase v0.2.0
+	github.com/imdario/mergo v0.3.15
 	github.com/samber/lo v1.38.1
 	github.com/spewerspew/spew v0.0.0-20220201233537-1fb8bf5ed3d2
 	github.com/stretchr/testify v1.8.2

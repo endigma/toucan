@@ -9,6 +9,10 @@ import (
 )
 
 func Generate(schema *schema.Schema, output *codegen.OutputConfig) error {
+	if err := schema.Validate(); err != nil {
+		return fmt.Errorf("failed to validate schema: %w", err)
+	}
+
 	generator := codegen.NewGenerator(schema, output)
 
 	// Delete all files in the output directory.

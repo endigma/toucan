@@ -1,29 +1,30 @@
 package main
 
 import (
-	"github.com/endigma/toucan/config"
+	"github.com/endigma/toucan/api"
+	"github.com/endigma/toucan/codegen"
+	"github.com/endigma/toucan/schema"
 )
 
 func main() {
-	_, err := config.LoadSchema("policy/schema/*")
+	loadedSchema, err := schema.LoadSchema("policy/schema/*.hcl")
 	if err != nil {
 		panic(err)
 	}
 
-	// cfg, err := config.LoadConfig("toucan.hcl")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	// You can modify the schema after loading it.
+	loadedSchema.Actor = schema.Model{
+		Path: "github.com/endigma/toucan/_examples/basic/models",
+		Name: "User",
+	}
 
-	// spec, err := spec.FromConfig(cfg)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// err = api.Generate(spec, &cfg.)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	err = api.Generate(loadedSchema, &codegen.OutputConfig{
+		Path:    "./gen/toucan",
+		Package: "policy",
+	})
+	if err != nil {
+		panic(err)
+	}
 
 	return
 }

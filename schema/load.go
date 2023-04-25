@@ -8,18 +8,29 @@ import (
 
 	"github.com/alecthomas/hcl/v2"
 	"github.com/go-playground/mold/v4/modifiers"
-	"github.com/spewerspew/spew"
+	"github.com/imdario/mergo"
 )
 
 func LoadSchema(resourceCfgGlob string) (*Schema, error) {
 	filenames, err := filepath.Glob(resourceCfgGlob)
 	if err != nil {
-		return nil, fmt.Errorf("failed to glob resource configs: %w", err)
+		return nil, fmt.Errorf("failed to glob schema files: %w", err)
 	}
 
-	spew.Dump(filenames)
+	var schema Schema
 
-	return &Schema{}, nil
+	for _, filename := range filenames {
+		fileSchema, err := LoadSchemaFile(filename)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load schema file: %w", err)
+		}
+
+		if err := mergo.Merge(&schema, fileSchema, mergo.WithOverride, mergo.WithAppendSlice); err != nil {
+			return nil, fmt.Errorf("failed to merge schemas: %w", err)
+		}
+	}
+
+	return &schema, nil
 }
 
 func ReadSchemaFile(data []byte) (*Schema, error) {
@@ -37,11 +48,6 @@ func ReadSchemaFile(data []byte) (*Schema, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to transform config: %w", err)
 	}
-
-	// err = validate.Struct(&schema)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to validate config: %w", err)
-	// }
 
 	return &schema, nil
 }
