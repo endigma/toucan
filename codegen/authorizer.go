@@ -85,19 +85,6 @@ func generateAuthorizerCase(group *Group, res schema.ResourceSchema, perm string
 					group.Line()
 				}
 			})
-
-	// 	Return(lo.Reduce(sources, func(statement *Statement, source schema.PermissionSource, number int) *Statement {
-	// 		resolver, params := CallPermissionSource(source)
-
-	// 		call := Id("resolver").Dot(resolver).Add(params)
-
-	// 		if number == 0 {
-	// 			return statement.Add(call)
-	// 		} else {
-	// 			return statement.Op("||").Line().Add(call)
-	// 		}
-	// 	}, &Statement{})),
-	// )
 }
 
 func generateGlobalAuthorizer(group *Group, actor schema.Model, resources []schema.ResourceSchema) {
