@@ -5,14 +5,19 @@ import (
 
 	"github.com/endigma/toucan/_examples/basic/gen/toucan"
 	"github.com/endigma/toucan/_examples/basic/models"
+	"github.com/endigma/toucan/decision"
 )
 
-func (e *userResolver) HasRole(ctx context.Context, user *models.User, role toucan.UserRole, repository *models.User) bool {
-	return false
+func (e userResolver) HasRoleAdmin(context context.Context, actor *models.User, resource *models.User) decision.Decision {
+	return decision.Allow("")
 }
 
-func (e *userResolver) HasAttribute(ctx context.Context, attr toucan.UserAttribute, repository *models.User) bool {
-	return false
+func (e userResolver) HasRoleSelf(context context.Context, actor *models.User, resource *models.User) decision.Decision {
+	return decision.Allow("")
+}
+
+func (e userResolver) HasRoleViewer(context context.Context, actor *models.User, resource *models.User) decision.Decision {
+	return decision.Allow("")
 }
 
 type userResolver struct{ *Resolver }

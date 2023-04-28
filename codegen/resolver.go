@@ -5,19 +5,19 @@ import (
 	"github.com/endigma/toucan/schema"
 )
 
-func generateResourceResolver(group *Group, actor schema.Model, resource schema.ResourceSchema) error {
-	group.Comment("Resolver for resource `" + resource.Name + "`")
+func (gen *Generator) generateResourceResolver(file *File, resource schema.ResourceSchema) error {
+	file.Comment("Resolver for resource `" + resource.Name + "`")
 
 	// Generate resolver interface
-	group.Type().Id(pascal(resource.Name) + "Resolver").InterfaceFunc(func(group *Group) {
+	file.Type().Id(pascal(resource.Name) + "Resolver").InterfaceFunc(func(group *Group) {
 		// Role resolver
 		if len(resource.Roles) > 0 {
 			for _, role := range resource.Roles {
 				group.Id("HasRole"+pascal(role.Name)).Params(
 					Id("context").Qual("context", "Context"),
-					Id("actor").Op("*").Qual(actor.Path, actor.Name),
+					Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 					Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name),
-				).Bool()
+				).Add(RuntimeDecision())
 			}
 		}
 
@@ -27,7 +27,7 @@ func generateResourceResolver(group *Group, actor schema.Model, resource schema.
 				group.Id("HasAttribute"+pascal(attribute.Name)).Params(
 					Id("context").Qual("context", "Context"),
 					Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name),
-				).Bool()
+				).Add(RuntimeDecision())
 			}
 		}
 	})

@@ -20,11 +20,9 @@ func main() {
 
 	err = api.Generate(loadedSchema, &codegen.OutputConfig{
 		Path:    "./gen/toucan",
-		Package: "policy",
+		Package: "toucan",
 	})
 	if err != nil {
 		panic(err)
 	}
-
-	return
 }

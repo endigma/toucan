@@ -14,8 +14,4 @@ resource "user" {
   role "viewer" {
     permissions = ["read"]
   }
-
-  attribute "public" {
-    permissions = ["read"]
-  }
 }

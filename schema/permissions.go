@@ -42,25 +42,5 @@ func (resource ResourceSchema) GetAttributeSources(permission string) []Permissi
 
 // GetPermissionSources returns all sources of a permission.
 func (resource ResourceSchema) GetPermissionSources(permission string) []PermissionSource {
-	sources := []PermissionSource{}
-
-	for _, attr := range resource.Attributes {
-		if lo.Contains(attr.Permissions, permission) {
-			sources = append(sources, PermissionSource{
-				Type: "attribute",
-				Name: strcase.ToCamel(strcase.ToCamel(attr.Name)),
-			})
-		}
-	}
-
-	for _, role := range resource.Roles {
-		if lo.Contains(role.Permissions, permission) {
-			sources = append(sources, PermissionSource{
-				Type: "role",
-				Name: strcase.ToCamel(strcase.ToCamel(role.Name)),
-			})
-		}
-	}
-
-	return sources
+	return append(resource.GetRoleSources(permission), resource.GetAttributeSources(permission)...)
 }

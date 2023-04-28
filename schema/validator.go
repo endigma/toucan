@@ -146,6 +146,8 @@ func notReservedValidator(fieldLevel validator.FieldLevel) bool {
 		"role",
 		"resource",
 		"actor",
+		"permission",
+		"decision",
 	}, strcase.ToLowerCamel(field.String()))
 }
 

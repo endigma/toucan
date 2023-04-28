@@ -5,10 +5,10 @@ import (
 	"github.com/endigma/toucan/schema"
 )
 
-func generateResourceTypes(group *Group, resource schema.ResourceSchema) error {
+func (gen *Generator) generateResourceTypes(file *File, resource schema.ResourceSchema) error {
 	// Generate permissions enum
 	if len(resource.Permissions) > 0 {
-		err := generateStringEnum(group, resource.Name+"Permission", resource.Permissions)
+		err := generateStringEnum(file.Group, resource.Name+"Permission", resource.Permissions)
 		if err != nil {
 			return err
 		}
@@ -39,6 +39,8 @@ func generateResourceTypes(group *Group, resource schema.ResourceSchema) error {
 	// 	}
 	// }
 
+	file.Line()
+
 	return nil
 }
 
@@ -51,8 +53,6 @@ func generateStringEnum(group *Group, name string, values []string) error {
 	namesMap := camel(name) + "Map"
 	errInvalid := "ErrInvalid" + enumName
 	errNil := "ErrNil" + enumName
-
-	group.Comment("Enum " + enumName)
 
 	group.Type().Id(enumName).String()
 

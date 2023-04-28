@@ -6,34 +6,85 @@ import (
 
 	"github.com/endigma/toucan/_examples/basic/gen/toucan"
 	"github.com/endigma/toucan/_examples/basic/models"
-	"github.com/endigma/toucan/_examples/basic/resolvers"
+	"github.com/endigma/toucan/_examples/basic/policy/resolvers"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPolicy(t *testing.T) {
+func TestAuthorization(t *testing.T) {
 	ctx := context.Background()
-
-	authorizer := toucan.NewAuthorizer(resolvers.NewResolver())
-
-	tom, jerry := models.NewUser("Tom"), models.NewUser("Jerry")
-
-	// users := []*models.User{tom, jerry}
 
 	google := models.NewRepository("Google", true)
 	facebook := models.NewRepository("Facebook", false)
 
-	// repos := []*models.Repository{google, facebook}
+	tom, jerry, graham := models.NewUser("Tom", models.RepositoryRole{Role: "owner", Repo: facebook.ID}),
+		models.NewUser("Jerry", models.RepositoryRole{Role: "editor", Repo: google.ID}),
+		models.NewUser("Graham", models.RepositoryRole{Role: "viewer", Repo: facebook.ID})
 
-	assert.True(t,
-		authorizer.Authorize(tom, "read", google),
-		"Tom should be able to read Google",
-	)
+	authorizer := toucan.NewAuthorizer(resolvers.NewResolver())
 
-	assert.True(t,
-		authorizer.Authorize(tom, "read", facebook),
-		"Tom should be able to read Facebook",
-	)
+	// Define test cases
+	testCases := []struct {
+		name     string
+		user     *models.User
+		action   string
+		repo     *models.Repository
+		expected bool
+	}{
+		{
+			name:     "Tom can read Facebook",
+			user:     tom,
+			action:   "read",
+			repo:     facebook,
+			expected: true,
+		},
+		{
+			name:     "Tom can delete Facebook",
+			user:     tom,
+			action:   "delete",
+			repo:     facebook,
+			expected: true,
+		},
+		{
+			name:     "Jerry can read Google",
+			user:     jerry,
+			action:   "read",
+			repo:     google,
+			expected: true,
+		},
+		{
+			name:     "Graham can read Facebook",
+			user:     graham,
+			action:   "read",
+			repo:     facebook,
+			expected: true,
+		},
+		{
+			name:     "Jerry cannot read Facebook",
+			user:     jerry,
+			action:   "read",
+			repo:     facebook,
+			expected: false,
+		},
+		{
+			name:     "Graham cannot delete Facebook",
+			user:     graham,
+			action:   "delete",
+			repo:     facebook,
+			expected: false,
+		},
+		{
+			name:     "Jerry cannot delete Google",
+			user:     jerry,
+			action:   "delete",
+			repo:     google,
+			expected: false,
+		},
+	}
 
-	assert.True(t, authorizer.Authorize(jerry, "read", google), "Jerry should be able to read Google")
-	assert.False(t, authorizer.Authorize(jerry, "read", facebook), "Jerry should not be able to read Facebook")
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := authorizer.Authorize(ctx, tc.user, tc.action, tc.repo)
+			assert.Equal(t, result.Allow, tc.expected)
+		})
+	}
 }
