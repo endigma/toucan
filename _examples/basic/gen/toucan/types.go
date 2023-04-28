@@ -27,7 +27,7 @@ func (s RepositoryPermission) Valid() bool {
 }
 
 var (
-	ErrInvalidRepositoryPermission = fmt.Errorf("not a valid repositoryPermission, try [%s]", strings.Join(repositoryPermissionNames, ", "))
+	ErrInvalidRepositoryPermission = fmt.Errorf("not a valid RepositoryPermission, try [%s]", strings.Join(repositoryPermissionNames, ", "))
 	ErrNilRepositoryPermission     = errors.New("value is nil")
 )
 
@@ -72,7 +72,7 @@ func (s UserPermission) Valid() bool {
 }
 
 var (
-	ErrInvalidUserPermission = fmt.Errorf("not a valid userPermission, try [%s]", strings.Join(userPermissionNames, ", "))
+	ErrInvalidUserPermission = fmt.Errorf("not a valid UserPermission, try [%s]", strings.Join(userPermissionNames, ", "))
 	ErrNilUserPermission     = errors.New("value is nil")
 )
 
