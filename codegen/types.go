@@ -8,7 +8,7 @@ import (
 func (gen *Generator) generateResourceTypes(file *File, resource schema.ResourceSchema) error {
 	// Generate permissions enum
 	if len(resource.Permissions) > 0 {
-		enumGen := newEnumGenerator(resource.Name+"Permission", resource.Permissions)
+		enumGen := newEnumGenerator(resource.Name+"Permission", resource.Permissions, EnumGeneratorFeatures{})
 
 		err := enumGen.Generate(file.Group)
 		if err != nil {
@@ -30,9 +30,18 @@ type enumGenerator struct {
 	errNil     string
 
 	values []string
+
+	features EnumGeneratorFeatures
 }
 
-func newEnumGenerator(name string, values []string) *enumGenerator {
+type EnumGeneratorFeatures struct {
+	MarshalerUnmarshaler bool
+	ScannerValuer        bool
+	StringHelper         bool
+	ValidHelper          bool
+}
+
+func newEnumGenerator(name string, values []string, features EnumGeneratorFeatures) *enumGenerator {
 	return &enumGenerator{
 		enumName:   pascal(name),
 		parserName: "Parse" + pascal(name),
@@ -42,6 +51,8 @@ func newEnumGenerator(name string, values []string) *enumGenerator {
 		errNil:     "ErrNil" + pascal(name),
 
 		values: values,
+
+		features: features,
 	}
 }
 
@@ -53,13 +64,7 @@ func (gen *enumGenerator) Generate(group *Group) error {
 		for _, value := range gen.values {
 			group.Id(gen.enumName + pascal(value)).Id(pascal(gen.enumName)).Op("=").Lit(snake(value))
 		}
-	})
-
-	// ToString helper
-	gen.generateToStringHelper(group)
-
-	// Valid helper
-	gen.generateValidHelper(group)
+	}).Line()
 
 	group.Var().Defs(
 		Id(gen.errInvalid).
@@ -76,10 +81,9 @@ func (gen *enumGenerator) Generate(group *Group) error {
 			Call(
 				Lit("value is nil"),
 			),
-	)
+	).Line()
 
-	group.Line()
-
+	// Definitions
 	group.Var().Defs(
 		Id(gen.namesMap).Op("=").Map(String()).Id(gen.enumName).Values(DictFunc(func(d Dict) {
 			for _, value := range gen.values {
@@ -91,11 +95,26 @@ func (gen *enumGenerator) Generate(group *Group) error {
 				group.String().Parens(Id(gen.enumName + pascal(value)))
 			}
 		}),
-	)
+	).Line()
 
+	// Parsing/validation
+	gen.generateValidHelper(group)
 	gen.generateParser(group)
 
-	// TODO: Feature flags
+	// Feature Flags
+	if gen.features.MarshalerUnmarshaler {
+		gen.generateMarshalText(group)
+		gen.generateUnmarshalText(group)
+	}
+
+	if gen.features.ScannerValuer {
+		gen.generateScanner(group)
+		gen.generateValuer(group)
+	}
+
+	if gen.features.StringHelper {
+		gen.generateToStringHelper(group)
+	}
 
 	return nil
 }

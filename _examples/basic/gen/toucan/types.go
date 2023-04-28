@@ -17,15 +17,6 @@ const (
 	RepositoryPermissionSnakeCase RepositoryPermission = "snake_case"
 )
 
-func (s RepositoryPermission) String() string {
-	return string(s)
-}
-
-func (s RepositoryPermission) Valid() bool {
-	_, err := ParseRepositoryPermission(string(s))
-	return err == nil
-}
-
 var (
 	ErrInvalidRepositoryPermission = fmt.Errorf("not a valid RepositoryPermission, try [%s]", strings.Join(repositoryPermissionNames, ", "))
 	ErrNilRepositoryPermission     = errors.New("value is nil")
@@ -40,6 +31,11 @@ var (
 	}
 	repositoryPermissionNames = []string{string(RepositoryPermissionRead), string(RepositoryPermissionPush), string(RepositoryPermissionDelete), string(RepositoryPermissionSnakeCase)}
 )
+
+func (s RepositoryPermission) Valid() bool {
+	_, err := ParseRepositoryPermission(string(s))
+	return err == nil
+}
 
 func ParseRepositoryPermission(s string) (RepositoryPermission, error) {
 	if x, ok := repositoryPermissionMap[s]; ok {
@@ -62,15 +58,6 @@ const (
 	UserPermissionDelete UserPermission = "delete"
 )
 
-func (s UserPermission) String() string {
-	return string(s)
-}
-
-func (s UserPermission) Valid() bool {
-	_, err := ParseUserPermission(string(s))
-	return err == nil
-}
-
 var (
 	ErrInvalidUserPermission = fmt.Errorf("not a valid UserPermission, try [%s]", strings.Join(userPermissionNames, ", "))
 	ErrNilUserPermission     = errors.New("value is nil")
@@ -84,6 +71,11 @@ var (
 	}
 	userPermissionNames = []string{string(UserPermissionRead), string(UserPermissionWrite), string(UserPermissionDelete)}
 )
+
+func (s UserPermission) Valid() bool {
+	_, err := ParseUserPermission(string(s))
+	return err == nil
+}
 
 func ParseUserPermission(s string) (UserPermission, error) {
 	if x, ok := userPermissionMap[s]; ok {
