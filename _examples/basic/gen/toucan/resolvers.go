@@ -22,8 +22,16 @@ type UserResolver interface {
 	HasRoleViewer(context context.Context, actor *models.User, resource *models.User) decision.Decision
 }
 
-// Global resolver
+// Resolver for global scope
+type GlobalResolver interface {
+	HasRoleAdmin(context context.Context, actor *models.User) decision.Decision
+	HasAttributeProfilesArePublic(context context.Context) decision.Decision
+}
+
+// Root Resolver
 type Resolver interface {
+	Global() GlobalResolver
+
 	Repository() RepositoryResolver
 	User() UserResolver
 }

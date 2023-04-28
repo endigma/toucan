@@ -10,10 +10,10 @@ type PermissionSource struct {
 	Name string
 }
 
-func (resource ResourceSchema) GetRoleSources(permission string) []PermissionSource {
+func GetRoleSources(permission string, roles []RoleSchema) []PermissionSource {
 	sources := []PermissionSource{}
 
-	for _, role := range resource.Roles {
+	for _, role := range roles {
 		if lo.Contains(role.Permissions, permission) {
 			sources = append(sources, PermissionSource{
 				Type: "role",
@@ -25,10 +25,10 @@ func (resource ResourceSchema) GetRoleSources(permission string) []PermissionSou
 	return sources
 }
 
-func (resource ResourceSchema) GetAttributeSources(permission string) []PermissionSource {
+func GetAttributeSources(permission string, attributes []AttributeSchema) []PermissionSource {
 	sources := []PermissionSource{}
 
-	for _, attr := range resource.Attributes {
+	for _, attr := range attributes {
 		if lo.Contains(attr.Permissions, permission) {
 			sources = append(sources, PermissionSource{
 				Type: "attribute",
@@ -38,6 +38,18 @@ func (resource ResourceSchema) GetAttributeSources(permission string) []Permissi
 	}
 
 	return sources
+}
+
+func GetPermissionSources(permission string, attributes []AttributeSchema, roles []RoleSchema) []PermissionSource {
+	return append(GetRoleSources(permission, roles), GetAttributeSources(permission, attributes)...)
+}
+
+func (resource ResourceSchema) GetRoleSources(permission string) []PermissionSource {
+	return GetRoleSources(permission, resource.Roles)
+}
+
+func (resource ResourceSchema) GetAttributeSources(permission string) []PermissionSource {
+	return GetAttributeSources(permission, resource.Attributes)
 }
 
 // GetPermissionSources returns all sources of a permission.

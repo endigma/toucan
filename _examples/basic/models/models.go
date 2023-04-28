@@ -14,7 +14,7 @@ type User struct {
 	Roles []RepositoryRole `json:"roles"`
 }
 
-func NewUser(name string, roles ...RepositoryRole) *User {
+func NewUser(name string, admin bool, roles ...RepositoryRole) *User {
 	return &User{
 		ID:    xid.New(),
 		Name:  name,

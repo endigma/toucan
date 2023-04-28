@@ -35,7 +35,6 @@ linters:
     - goprintffuncname
     - gosec
     - importas
-    - ireturn
     - lll
     - interfacebloat
     - misspell

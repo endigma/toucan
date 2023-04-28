@@ -8,7 +8,7 @@ import (
 )
 
 func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resource *models.Repository) decision.Decision {
-	resolver := a.resolver.Repository()
+	resolver := a.Repository()
 
 	if !action.Valid() {
 		return decision.Error(ErrInvalidRepositoryPermission)
@@ -69,11 +69,27 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 		}
 	}
 
-	return decision.Skip("unmatched")
+	return decision.False("unmatched")
+}
+
+func (a Authorizer) FilterRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resources []*models.Repository) ([]*models.Repository, error) {
+	if !action.Valid() {
+		return nil, ErrInvalidRepositoryPermission
+	}
+
+	var allowedResolvers []*models.Repository
+	for _, resource := range resources {
+		result := a.AuthorizeRepository(ctx, actor, action, resource)
+		if result.Allow {
+			allowedResolvers = append(allowedResolvers, resource)
+		}
+	}
+
+	return allowedResolvers, nil
 }
 
 func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, action UserPermission, resource *models.User) decision.Decision {
-	resolver := a.resolver.User()
+	resolver := a.User()
 
 	if !action.Valid() {
 		return decision.Error(ErrInvalidUserPermission)
@@ -117,12 +133,58 @@ func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, actio
 		}
 	}
 
-	return decision.Skip("unmatched")
+	return decision.False("unmatched")
 }
 
-// Global authorizer
+func (a Authorizer) FilterUser(ctx context.Context, actor *models.User, action UserPermission, resources []*models.User) ([]*models.User, error) {
+	if !action.Valid() {
+		return nil, ErrInvalidUserPermission
+	}
+
+	var allowedResolvers []*models.User
+	for _, resource := range resources {
+		result := a.AuthorizeUser(ctx, actor, action, resource)
+		if result.Allow {
+			allowedResolvers = append(allowedResolvers, resource)
+		}
+	}
+
+	return allowedResolvers, nil
+}
+
+func (a Authorizer) AuthorizeGlobal(ctx context.Context, actor *models.User, action GlobalPermission) decision.Decision {
+	resolver := a.Global()
+
+	if !action.Valid() {
+		return decision.Error(ErrInvalidGlobalPermission)
+	}
+
+	switch action {
+	case GlobalPermissionReadAllUsers:
+		// Source: role - Admin
+		if result := resolver.HasRoleAdmin(ctx, actor); result.Allow {
+			return result
+		}
+
+	case GlobalPermissionWriteAllUsers:
+		// Source: role - Admin
+		if result := resolver.HasRoleAdmin(ctx, actor); result.Allow {
+			return result
+		}
+
+	case GlobalPermissionReadAllProfiles:
+		// Source: attribute - ProfilesArePublic
+		if result := resolver.HasAttributeProfilesArePublic(ctx); result.Allow {
+			return result
+		}
+
+	}
+	return decision.False("unmatched")
+}
+
+// Authorizer
 type Authorizer struct {
-	resolver Resolver
+	Resolver
 }
 
 func (a Authorizer) Authorize(ctx context.Context, actor *models.User, permission string, resource any) decision.Decision {
@@ -139,9 +201,9 @@ func (a Authorizer) Authorize(ctx context.Context, actor *models.User, permissio
 		}
 	}
 
-	return decision.Skip("unmatched")
+	return decision.False("unmatched")
 }
 
 func NewAuthorizer(resolver Resolver) *Authorizer {
-	return &Authorizer{resolver: resolver}
+	return &Authorizer{Resolver: resolver}
 }

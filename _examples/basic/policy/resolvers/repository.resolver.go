@@ -11,38 +11,38 @@ import (
 func (e repositoryResolver) HasRoleOwner(context context.Context, actor *models.User, resource *models.Repository) decision.Decision {
 	for _, role := range actor.Roles {
 		if role.Repo == resource.ID && role.Role == "owner" {
-			return decision.Allow("actor is viewer")
+			return decision.True("actor is viewer")
 		}
 	}
 
-	return decision.Skip("no viewer role")
+	return decision.False("no viewer role")
 }
 
 func (e repositoryResolver) HasRoleEditor(context context.Context, actor *models.User, resource *models.Repository) decision.Decision {
 	for _, role := range actor.Roles {
 		if role.Repo == resource.ID && role.Role == "editor" {
-			return decision.Allow("actor is viewer")
+			return decision.True("actor is viewer")
 		}
 	}
 
-	return decision.Skip("no viewer role")
+	return decision.False("no viewer role")
 }
 
 func (e repositoryResolver) HasRoleViewer(context context.Context, actor *models.User, resource *models.Repository) decision.Decision {
 	for _, role := range actor.Roles {
 		if role.Repo == resource.ID && role.Role == "viewer" {
-			return decision.Allow("actor is viewer")
+			return decision.True("actor is viewer")
 		}
 	}
 
-	return decision.Skip("no viewer role")
+	return decision.False("no viewer role")
 }
 
 func (e repositoryResolver) HasAttributePublic(context context.Context, resource *models.Repository) decision.Decision {
 	if resource.Public {
-		return decision.Allow("repository is public")
+		return decision.True("repository is public")
 	} else {
-		return decision.Skip("repository is private")
+		return decision.False("repository is private")
 	}
 }
 

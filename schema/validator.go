@@ -41,6 +41,26 @@ func (s *Schema) Validate() error {
 		}
 	}
 
+	if err := s.Global.Validate(); err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	return result.ErrorOrNil()
+}
+
+func (global *GlobalSchema) Validate() error {
+	var result *multierror.Error
+
+	isValidPerm := func(perm string) bool {
+		return lo.Contains(global.Permissions, perm)
+	}
+
+	for _, permission := range global.Permissions {
+		if !isValidPerm(permission) {
+			result = multierror.Append(result, fmt.Errorf("%w: %q", ErrInvalidPermission, permission))
+		}
+	}
+
 	return result.ErrorOrNil()
 }
 
@@ -86,7 +106,7 @@ func (resource *ResourceSchema) Validate() error {
 		}
 	}
 
-	return nil
+	return result.ErrorOrNil()
 }
 
 func NewSchemaValidator() *validator.Validate {
@@ -148,6 +168,8 @@ func notReservedValidator(fieldLevel validator.FieldLevel) bool {
 		"actor",
 		"permission",
 		"decision",
+		"global",
+		"root",
 	}, strcase.ToLowerCamel(field.String()))
 }
 

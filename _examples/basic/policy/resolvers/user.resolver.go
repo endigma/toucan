@@ -9,15 +9,15 @@ import (
 )
 
 func (e userResolver) HasRoleAdmin(context context.Context, actor *models.User, resource *models.User) decision.Decision {
-	return decision.Allow("")
+	return decision.True("")
 }
 
 func (e userResolver) HasRoleSelf(context context.Context, actor *models.User, resource *models.User) decision.Decision {
-	return decision.Allow("")
+	return decision.True("")
 }
 
 func (e userResolver) HasRoleViewer(context context.Context, actor *models.User, resource *models.User) decision.Decision {
-	return decision.Allow("")
+	return decision.True("")
 }
 
 type userResolver struct{ *Resolver }

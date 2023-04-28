@@ -30,34 +30,37 @@ func (gen *Generator) Generate() error {
 	// Generate resources
 	for _, resource := range gen.Schema.Resources {
 		// Generate types
-		if err := gen.generateResourceTypes(typesFile, resource); err != nil {
-			return err
-		}
+		gen.generateResourceTypes(typesFile, resource)
 
 		// Generate resolver
-		if err := gen.generateResourceResolver(resolverFile, resource); err != nil {
-			return err
-		}
+		gen.generateResourceResolver(resolverFile, resource)
 
-		// Generate resolver
-		if err := gen.generateResourceAuthorizer(authorizerFile, resource); err != nil {
-			return err
-		}
+		// Generate authorizer
+		gen.generateResourceAuthorizer(authorizerFile, resource)
+
+		// Generate filter
+		gen.generateResourceFilter(authorizerFile, resource)
 	}
+
+	gen.generateGlobalTypes(typesFile)
+
+	gen.generateGlobalResolver(resolverFile)
+
+	gen.generateGlobalAuthorizer(authorizerFile)
 
 	if err := typesFile.Save(filepath.Join(gen.Output.Path + "/types.go")); err != nil {
 		return fmt.Errorf("failed to save file: %w", err)
 	}
 
-	// Generate global resolver
-	generateGlobalResolver(resolverFile.Group, gen.Schema.Resources)
+	// Generate resolver
+	gen.generateResolverRoot(resolverFile.Group)
 
 	if err := resolverFile.Save(filepath.Join(gen.Output.Path + "/resolvers.go")); err != nil {
 		return fmt.Errorf("failed to save file: %w", err)
 	}
 
-	// Generate global authorizer
-	generateGlobalAuthorizer(authorizerFile.Group, gen.Schema.Actor, gen.Schema.Resources)
+	// Generate authorizer
+	gen.generateAuthorizerRoot(authorizerFile.Group)
 
 	if err := authorizerFile.Save(filepath.Join(gen.Output.Path + "/authorizers.go")); err != nil {
 		return fmt.Errorf("failed to save file: %w", err)

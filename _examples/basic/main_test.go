@@ -16,11 +16,13 @@ func TestAuthorization(t *testing.T) {
 	google := models.NewRepository("Google", true)
 	facebook := models.NewRepository("Facebook", false)
 
-	tom, jerry, graham := models.NewUser("Tom", models.RepositoryRole{Role: "owner", Repo: facebook.ID}),
-		models.NewUser("Jerry", models.RepositoryRole{Role: "editor", Repo: google.ID}),
-		models.NewUser("Graham", models.RepositoryRole{Role: "viewer", Repo: facebook.ID})
+	tom, jerry, graham := models.NewUser("Tom", false, models.RepositoryRole{Role: "owner", Repo: facebook.ID}),
+		models.NewUser("Jerry", false, models.RepositoryRole{Role: "editor", Repo: google.ID}),
+		models.NewUser("Graham", false, models.RepositoryRole{Role: "viewer", Repo: facebook.ID})
 
 	authorizer := toucan.NewAuthorizer(resolvers.NewResolver())
+
+	assert.True(t, authorizer.Repository().HasRoleEditor(ctx, jerry, google).Allow)
 
 	// Define test cases
 	testCases := []struct {
@@ -87,4 +89,25 @@ func TestAuthorization(t *testing.T) {
 			assert.Equal(t, result.Allow, tc.expected)
 		})
 	}
+}
+
+func TestFilter(t *testing.T) {
+	ctx := context.Background()
+
+	google := models.NewRepository("Google", true)
+	facebook := models.NewRepository("Facebook", false)
+
+	tom := models.NewUser("Tom", false, models.RepositoryRole{Role: "owner", Repo: facebook.ID})
+
+	authorizer := toucan.NewAuthorizer(resolvers.NewResolver())
+
+	allRepos := []*models.Repository{facebook, google}
+
+	readRepos, err := authorizer.FilterRepository(ctx, tom, toucan.RepositoryPermissionRead, allRepos)
+	assert.Nil(t, err)
+	assert.Equal(t, 2, len(readRepos), "there should be two repositories")
+
+	writeRepos, err := authorizer.FilterRepository(ctx, tom, toucan.RepositoryPermissionPush, allRepos)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(writeRepos), "there should be one repository")
 }

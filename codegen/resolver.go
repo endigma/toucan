@@ -5,7 +5,7 @@ import (
 	"github.com/endigma/toucan/schema"
 )
 
-func (gen *Generator) generateResourceResolver(file *File, resource schema.ResourceSchema) error {
+func (gen *Generator) generateResourceResolver(file *File, resource schema.ResourceSchema) {
 	file.Comment("Resolver for resource `" + resource.Name + "`")
 
 	// Generate resolver interface
@@ -31,14 +31,39 @@ func (gen *Generator) generateResourceResolver(file *File, resource schema.Resou
 			}
 		}
 	})
-
-	return nil
 }
 
-func generateGlobalResolver(group *Group, resources []schema.ResourceSchema) {
-	group.Comment("Global resolver")
+func (gen *Generator) generateGlobalResolver(file *File) {
+	file.Comment("Resolver for global scope")
+
+	// Generate resolver interface
+	file.Type().Id("GlobalResolver").InterfaceFunc(func(group *Group) {
+		// Role resolver
+		if len(gen.Schema.Global.Roles) > 0 {
+			for _, role := range gen.Schema.Global.Roles {
+				group.Id("HasRole"+pascal(role.Name)).Params(
+					Id("context").Qual("context", "Context"),
+					Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
+				).Add(RuntimeDecision())
+			}
+		}
+
+		// Attribute resolver
+		if len(gen.Schema.Global.Attributes) > 0 {
+			for _, attribute := range gen.Schema.Global.Attributes {
+				group.Id("HasAttribute" + pascal(attribute.Name)).Params(
+					Id("context").Qual("context", "Context"),
+				).Add(RuntimeDecision())
+			}
+		}
+	})
+}
+
+func (gen *Generator) generateResolverRoot(group *Group) {
+	group.Comment("Root Resolver")
 	group.Type().Id("Resolver").InterfaceFunc(func(group *Group) {
-		for _, resource := range resources {
+		group.Id("Global").Params().Id("GlobalResolver").Line()
+		for _, resource := range gen.Schema.Resources {
 			group.Id(pascal(resource.Name)).Params().Id(pascal(resource.Name) + "Resolver")
 		}
 	})

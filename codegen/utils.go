@@ -31,6 +31,26 @@ func paramsForAuthorizer(actor schema.Model, resource schema.ResourceSchema) []j
 	}
 }
 
+func paramsForFilter(actor schema.Model, resource schema.ResourceSchema) []jen.Code {
+	return []jen.Code{
+		jen.Id("ctx").Qual("context", "Context"),
+		jen.Id("actor").Op("*").Qual(actor.Path, actor.Name),
+		jen.Id("action").Id(pascal(resource.Name) + "Permission"),
+		jen.Id("resources").Index().Op("*").Qual(resource.Model.Path, resource.Model.Name),
+	}
+}
+
+func CallGlobalSource(source schema.PermissionSource) (string, *jen.Statement) {
+	switch source.Type {
+	case "role":
+		return "HasRole" + pascal(source.Name), jen.Call(jen.Id("ctx"), jen.Id("actor"))
+	case "attribute":
+		return "HasAttribute" + pascal(source.Name), jen.Call(jen.Id("ctx"))
+	}
+
+	return "", jen.Null()
+}
+
 func CallPermissionSource(source schema.PermissionSource) (string, *jen.Statement) {
 	switch source.Type {
 	case "role":

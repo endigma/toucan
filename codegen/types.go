@@ -5,20 +5,24 @@ import (
 	"github.com/endigma/toucan/schema"
 )
 
-func (gen *Generator) generateResourceTypes(file *File, resource schema.ResourceSchema) error {
+func (gen *Generator) generateResourceTypes(file *File, resource schema.ResourceSchema) {
 	// Generate permissions enum
 	if len(resource.Permissions) > 0 {
 		enumGen := newEnumGenerator(resource.Name+"Permission", resource.Permissions, EnumGeneratorFeatures{})
-
-		err := enumGen.Generate(file.Group)
-		if err != nil {
-			return err
-		}
+		enumGen.Generate(file.Group)
 	}
 
 	file.Line()
+}
 
-	return nil
+func (gen *Generator) generateGlobalTypes(file *File) {
+	// Generate permissions enum
+	if len(gen.Schema.Global.Permissions) > 0 {
+		enumGen := newEnumGenerator("GlobalPermission", gen.Schema.Global.Permissions, EnumGeneratorFeatures{})
+		enumGen.Generate(file.Group)
+	}
+
+	file.Line()
 }
 
 type enumGenerator struct {
@@ -56,7 +60,7 @@ func newEnumGenerator(name string, values []string, features EnumGeneratorFeatur
 	}
 }
 
-func (gen *enumGenerator) Generate(group *Group) error {
+func (gen *enumGenerator) Generate(group *Group) {
 	group.Type().Id(gen.enumName).String()
 
 	// Constants
@@ -115,8 +119,6 @@ func (gen *enumGenerator) Generate(group *Group) error {
 	if gen.features.StringHelper {
 		gen.generateToStringHelper(group)
 	}
-
-	return nil
 }
 
 func (gen *enumGenerator) generateParser(group *Group) {
