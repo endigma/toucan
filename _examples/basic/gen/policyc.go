@@ -1,26 +1,31 @@
 package main
 
 import (
-	log "github.com/sirupsen/logrus"
-
 	"github.com/endigma/toucan/api"
-	"github.com/endigma/toucan/config"
-	"github.com/endigma/toucan/spec"
+	"github.com/endigma/toucan/codegen"
+	"github.com/endigma/toucan/schema"
+	"github.com/spewerspew/spew"
 )
 
 func main() {
-	cfg, err := config.LoadConfig("toucan.hcl")
+	loadedSchema, err := schema.LoadSchema("policy/schema/*.hcl")
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
-	spec, err := spec.FromConfig(cfg)
-	if err != nil {
-		log.Fatal(err)
+	// You can modify the schema after loading it.
+	loadedSchema.Actor = schema.Model{
+		Path: "github.com/endigma/toucan/_examples/basic/models",
+		Name: "User",
 	}
 
-	err = api.Generate(spec)
+	spew.Dump(loadedSchema)
+
+	err = api.Generate(loadedSchema, &codegen.OutputConfig{
+		Path:    "./gen/toucan",
+		Package: "toucan",
+	})
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 }

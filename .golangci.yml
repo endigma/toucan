@@ -1,0 +1,76 @@
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - revive
+    - asasalint
+    - containedctx
+    - contextcheck
+    - cyclop
+    - decorder
+    - dogsled
+    - dupl
+    - durationcheck
+    - dupword
+    - errname
+    - errorlint
+    - exhaustive
+    - exportloopref
+    - funlen
+    - gci
+    - gocheckcompilerdirectives
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - godot
+    - godox
+    - goerr113
+    - gofumpt
+    - gomnd
+    - goprintffuncname
+    - gosec
+    - importas
+    - lll
+    - interfacebloat
+    - misspell
+    - musttag
+    - nestif
+    - nilnil
+    - nlreturn
+    - nolintlint
+    - nonamedreturns
+    - prealloc
+    - predeclared
+    - reassign
+    - tenv
+    - testpackage
+    - thelper
+    - testableexamples
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - varnamelen
+    - wastedassign
+    - wrapcheck
+    - wsl
+linters-settings:
+  revive:
+    rules:
+      - name: dot-imports
+        disabled: true
+  wrapcheck:
+    ignoreSigs:
+      - .Errorf(
+      - errors.New(
+      - errors.Unwrap(
+      - .Wrap(
+      - .Wrapf(
+      - .WithMessage(
+      - .WithMessagef(
+      - .WithStack(
+      - .ErrorOrNil(

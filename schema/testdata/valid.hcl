@@ -1,10 +1,3 @@
-actor = "github.com/endigma/toucan/_examples/basic/models.User"
-
-output {
-  path    = "./gen/toucan/"
-  package = "toucan"
-}
-
 resource "repository" {
   model = "github.com/endigma/toucan/_examples/basic/models.Repository"
 
@@ -28,28 +21,6 @@ resource "repository" {
 
   // Attributes are a way to force a resolver 
   // for a particular group of permissions
-  attribute "public" {
-    permissions = ["read"]
-  }
-}
-
-resource "user" {
-  model = "github.com/endigma/toucan/_examples/basic/models.User"
-
-  permissions = ["read", "write", "delete"]
-
-  role "admin" {
-    permissions = ["read", "write", "delete"]
-  }
-
-  role "self" {
-    permissions = ["read", "write"]
-  }
-
-  role "viewer" {
-    permissions = ["read"]
-  }
-
   attribute "public" {
     permissions = ["read"]
   }
