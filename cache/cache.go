@@ -6,13 +6,15 @@ import (
 	"sync"
 
 	"github.com/endigma/toucan/decision"
+	"golang.org/x/sync/singleflight"
 )
 
 type ctxKey struct{}
 
 type Cache struct {
-	mu sync.RWMutex
-	m  map[string]decision.Decision
+	mu  sync.RWMutex
+	m   map[string]decision.Decision
+	sfg singleflight.Group
 }
 
 type CacheKey struct {
@@ -25,40 +27,52 @@ type CacheKey struct {
 
 func (c *CacheKey) string() string {
 	var sb strings.Builder
-	sb.WriteString(c.ActorKey)
-	sb.WriteByte('$')
-	sb.WriteString(c.Resource)
-	sb.WriteByte('$')
-	sb.WriteString(c.ResourceKey)
-	sb.WriteByte('$')
-	sb.WriteString(c.SourceType)
-	sb.WriteByte('$')
-	sb.WriteString(c.SourceName)
-	sb.WriteByte('$')
+	write := func(s string) {
+		if strings.ContainsRune(s, 0) {
+			panic("contained null byte")
+		}
+		sb.WriteString(s)
+		sb.WriteByte(0)
+	}
+	write(c.ActorKey)
+	write(c.Resource)
+	write(c.ResourceKey)
+	write(c.SourceType)
+	write(c.SourceName)
 	return sb.String()
 }
 
-func (c *Cache) Query(key CacheKey) (decision.Decision, bool) {
+func (c *Cache) query(keystr string) (decision.Decision, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	dec, ok := c.m[key.string()]
+	dec, ok := c.m[keystr]
 	return dec, ok
 }
 
-func (c *Cache) Insert(key CacheKey, dec decision.Decision) {
+func (c *Cache) insert(keystr string, dec decision.Decision) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.m[key.string()] = dec
+	c.m[keystr] = dec
 }
 
-func (c *Cache) QueryOr(key CacheKey, fallback func() decision.Decision) decision.Decision {
-	dec, ok := c.Query(key)
+func (c *Cache) Query(key CacheKey, fallback func() decision.Decision) decision.Decision {
+	keystr := key.string()
+	dec, ok := c.query(keystr)
 	if ok {
 		return dec
 	}
-	dec = fallback()
-	c.Insert(key, dec)
-	c.m[key.string()] = dec
+
+	v, err, _ := c.sfg.Do(keystr, func() (interface{}, error) {
+		return fallback(), nil
+	})
+	if err != nil {
+		// probably can't happen?
+		dec = decision.Error(err)
+	} else {
+		dec = v.(decision.Decision)
+	}
+
+	c.insert(keystr, dec)
 	return dec
 }
 
@@ -75,9 +89,9 @@ func FromContext(ctx context.Context) *Cache {
 	return c
 }
 
-func QueryOr(ctx context.Context, key CacheKey, fallback func() decision.Decision) decision.Decision {
+func Query(ctx context.Context, key CacheKey, fallback func() decision.Decision) decision.Decision {
 	if c := FromContext(ctx); c != nil {
-		return c.QueryOr(key, fallback)
+		return c.Query(key, fallback)
 	}
 	return fallback()
 }

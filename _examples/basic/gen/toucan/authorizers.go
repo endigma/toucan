@@ -6,10 +6,20 @@ import (
 	models "github.com/endigma/toucan/_examples/basic/models"
 	cache "github.com/endigma/toucan/cache"
 	decision "github.com/endigma/toucan/decision"
+	conc "github.com/sourcegraph/conc"
+	"strings"
 )
 
 func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resource *models.Repository) decision.Decision {
 	resolver := a.Repository()
+
+	var cancel func()
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+
+	results := make(chan decision.Decision)
+
+	var wg conc.WaitGroup
 
 	if !action.Valid() {
 		return decision.Error(ErrInvalidRepositoryPermission)
@@ -19,17 +29,17 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 		switch action {
 		case RepositoryPermissionRead:
 			// Source: attribute - Public
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "repository",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "attribute",
-				SourceName:  "Public",
-			}, func() decision.Decision {
-				return resolver.HasAttributePublic(ctx, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    "",
+					Resource:    "repository",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "attribute",
+					SourceName:  "Public",
+				}, func() decision.Decision {
+					return resolver.HasAttributePublic(ctx, resource)
+				})
+			})
 
 		}
 	}
@@ -38,103 +48,130 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 		switch action {
 		case RepositoryPermissionRead:
 			// Source: role - Owner
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "repository",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "role",
-				SourceName:  "Owner",
-			}, func() decision.Decision {
-				return resolver.HasRoleOwner(ctx, actor, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    actor.ToucanKey(),
+					Resource:    "repository",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "role",
+					SourceName:  "Owner",
+				}, func() decision.Decision {
+					return resolver.HasRoleOwner(ctx, actor, resource)
+				})
+			})
 
 			// Source: role - Editor
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "repository",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "role",
-				SourceName:  "Editor",
-			}, func() decision.Decision {
-				return resolver.HasRoleEditor(ctx, actor, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    actor.ToucanKey(),
+					Resource:    "repository",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "role",
+					SourceName:  "Editor",
+				}, func() decision.Decision {
+					return resolver.HasRoleEditor(ctx, actor, resource)
+				})
+			})
 
 			// Source: role - Viewer
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "repository",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "role",
-				SourceName:  "Viewer",
-			}, func() decision.Decision {
-				return resolver.HasRoleViewer(ctx, actor, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    actor.ToucanKey(),
+					Resource:    "repository",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "role",
+					SourceName:  "Viewer",
+				}, func() decision.Decision {
+					return resolver.HasRoleViewer(ctx, actor, resource)
+				})
+			})
 
 		case RepositoryPermissionPush:
 			// Source: role - Owner
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "repository",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "role",
-				SourceName:  "Owner",
-			}, func() decision.Decision {
-				return resolver.HasRoleOwner(ctx, actor, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    actor.ToucanKey(),
+					Resource:    "repository",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "role",
+					SourceName:  "Owner",
+				}, func() decision.Decision {
+					return resolver.HasRoleOwner(ctx, actor, resource)
+				})
+			})
 
 			// Source: role - Editor
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "repository",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "role",
-				SourceName:  "Editor",
-			}, func() decision.Decision {
-				return resolver.HasRoleEditor(ctx, actor, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    actor.ToucanKey(),
+					Resource:    "repository",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "role",
+					SourceName:  "Editor",
+				}, func() decision.Decision {
+					return resolver.HasRoleEditor(ctx, actor, resource)
+				})
+			})
 
 		case RepositoryPermissionDelete:
 			// Source: role - Owner
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "repository",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "role",
-				SourceName:  "Owner",
-			}, func() decision.Decision {
-				return resolver.HasRoleOwner(ctx, actor, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    actor.ToucanKey(),
+					Resource:    "repository",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "role",
+					SourceName:  "Owner",
+				}, func() decision.Decision {
+					return resolver.HasRoleOwner(ctx, actor, resource)
+				})
+			})
 
 		case RepositoryPermissionSnakeCase:
 			// Source: role - Owner
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "repository",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "role",
-				SourceName:  "Owner",
-			}, func() decision.Decision {
-				return resolver.HasRoleOwner(ctx, actor, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    actor.ToucanKey(),
+					Resource:    "repository",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "role",
+					SourceName:  "Owner",
+				}, func() decision.Decision {
+					return resolver.HasRoleOwner(ctx, actor, resource)
+				})
+			})
 
 		}
 	}
 
-	return decision.False("unmatched")
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var allowReason string
+	var denyReasons []string
+	for result := range results {
+		if result.Reason == "" {
+			result.Reason = "unspecified"
+		}
+		if result.Allow {
+			cancel()
+			allowReason = result.Reason
+		} else {
+			denyReasons = append(denyReasons, result.Reason)
+		}
+	}
+
+	if allowReason != "" {
+		return decision.True(allowReason)
+	} else {
+		result := decision.False(strings.Join(denyReasons, ", "))
+		if result.Reason == "" {
+			result.Reason = "unspecified"
+		}
+		return result
+	}
 }
 
 func (a Authorizer) FilterRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resources []*models.Repository) ([]*models.Repository, error) {
@@ -156,6 +193,14 @@ func (a Authorizer) FilterRepository(ctx context.Context, actor *models.User, ac
 func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, action UserPermission, resource *models.User) decision.Decision {
 	resolver := a.User()
 
+	var cancel func()
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+
+	results := make(chan decision.Decision)
+
+	var wg conc.WaitGroup
+
 	if !action.Valid() {
 		return decision.Error(ErrInvalidUserPermission)
 	}
@@ -164,89 +209,116 @@ func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, actio
 		switch action {
 		case UserPermissionRead:
 			// Source: role - Admin
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "user",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "role",
-				SourceName:  "Admin",
-			}, func() decision.Decision {
-				return resolver.HasRoleAdmin(ctx, actor, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    actor.ToucanKey(),
+					Resource:    "user",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "role",
+					SourceName:  "Admin",
+				}, func() decision.Decision {
+					return resolver.HasRoleAdmin(ctx, actor, resource)
+				})
+			})
 
 			// Source: role - Self
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "user",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "role",
-				SourceName:  "Self",
-			}, func() decision.Decision {
-				return resolver.HasRoleSelf(ctx, actor, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    actor.ToucanKey(),
+					Resource:    "user",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "role",
+					SourceName:  "Self",
+				}, func() decision.Decision {
+					return resolver.HasRoleSelf(ctx, actor, resource)
+				})
+			})
 
 			// Source: role - Viewer
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "user",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "role",
-				SourceName:  "Viewer",
-			}, func() decision.Decision {
-				return resolver.HasRoleViewer(ctx, actor, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    actor.ToucanKey(),
+					Resource:    "user",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "role",
+					SourceName:  "Viewer",
+				}, func() decision.Decision {
+					return resolver.HasRoleViewer(ctx, actor, resource)
+				})
+			})
 
 		case UserPermissionWrite:
 			// Source: role - Admin
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "user",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "role",
-				SourceName:  "Admin",
-			}, func() decision.Decision {
-				return resolver.HasRoleAdmin(ctx, actor, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    actor.ToucanKey(),
+					Resource:    "user",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "role",
+					SourceName:  "Admin",
+				}, func() decision.Decision {
+					return resolver.HasRoleAdmin(ctx, actor, resource)
+				})
+			})
 
 			// Source: role - Self
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "user",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "role",
-				SourceName:  "Self",
-			}, func() decision.Decision {
-				return resolver.HasRoleSelf(ctx, actor, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    actor.ToucanKey(),
+					Resource:    "user",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "role",
+					SourceName:  "Self",
+				}, func() decision.Decision {
+					return resolver.HasRoleSelf(ctx, actor, resource)
+				})
+			})
 
 		case UserPermissionDelete:
 			// Source: role - Admin
-			if result := cache.QueryOr(ctx, cache.CacheKey{
-				ActorKey:    actor.ToucanKey(),
-				Resource:    "user",
-				ResourceKey: resource.ToucanKey(),
-				SourceType:  "role",
-				SourceName:  "Admin",
-			}, func() decision.Decision {
-				return resolver.HasRoleAdmin(ctx, actor, resource)
-			}); result.Allow {
-				return result
-			}
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    actor.ToucanKey(),
+					Resource:    "user",
+					ResourceKey: resource.ToucanKey(),
+					SourceType:  "role",
+					SourceName:  "Admin",
+				}, func() decision.Decision {
+					return resolver.HasRoleAdmin(ctx, actor, resource)
+				})
+			})
 
 		}
 	}
 
-	return decision.False("unmatched")
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var allowReason string
+	var denyReasons []string
+	for result := range results {
+		if result.Reason == "" {
+			result.Reason = "unspecified"
+		}
+		if result.Allow {
+			cancel()
+			allowReason = result.Reason
+		} else {
+			denyReasons = append(denyReasons, result.Reason)
+		}
+	}
+
+	if allowReason != "" {
+		return decision.True(allowReason)
+	} else {
+		result := decision.False(strings.Join(denyReasons, ", "))
+		if result.Reason == "" {
+			result.Reason = "unspecified"
+		}
+		return result
+	}
 }
 
 func (a Authorizer) FilterUser(ctx context.Context, actor *models.User, action UserPermission, resources []*models.User) ([]*models.User, error) {

@@ -9,6 +9,7 @@ import (
 )
 
 var (
+	ConcWaitGroup   = func() *Statement { return Qual("github.com/sourcegraph/conc", "WaitGroup") }
 	RuntimeDecision = func() *Statement { return Qual("github.com/endigma/toucan/decision", "Decision") }
 	RuntimeTrue     = func() *Statement { return Qual("github.com/endigma/toucan/decision", "True") }
 	RuntimeFalse    = func() *Statement { return Qual("github.com/endigma/toucan/decision", "False") }
@@ -16,7 +17,7 @@ var (
 
 	RuntimeCache    = func() *Statement { return Qual("github.com/endigma/toucan/cache", "Cache") }
 	RuntimeCacheKey = func() *Statement { return Qual("github.com/endigma/toucan/cache", "CacheKey") }
-	RuntimeQueryOr  = func() *Statement { return Qual("github.com/endigma/toucan/cache", "QueryOr") }
+	RuntimeQuery    = func() *Statement { return Qual("github.com/endigma/toucan/cache", "Query") }
 )
 
 func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.ResourceSchema) {
@@ -30,6 +31,13 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 		).Add(RuntimeDecision()).
 		BlockFunc(func(group *Group) {
 			group.Id("resolver").Op(":=").Id("a").Dot(pascal(resource.Name)).Call().Line()
+
+			group.Var().Id("cancel").Func().Params()
+			group.Id("ctx").Op(",").Id("cancel").Op("=").Qual("context", "WithCancel").Call(Id("ctx"))
+			group.Defer().Id("cancel").Call().Line()
+
+			group.Id("results").Op(":=").Make(Chan().Add(RuntimeDecision())).Line()
+			group.Var().Id("wg").Add(ConcWaitGroup()).Line()
 
 			group.If(Op("!").Id("action").Dot("Valid").Call()).Block(
 				Return(
@@ -69,7 +77,35 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 				).Line()
 			}
 
-			group.Return(RuntimeFalse().Call(Lit("unmatched")))
+			group.Go().Func().Params().Block(
+				Id("wg").Dot("Wait").Call(),
+				Close(Id("results")),
+			).Call().Line()
+
+			group.Var().Id("allowReason").Add(String())
+			group.Var().Id("denyReasons").Op("[]").Add(String())
+
+			group.For(Id("result").Op(":=").Range().Id("results")).Block(
+				If(Id("result").Dot("Reason")).Op("==").Lit("").Block(
+					Id("result").Dot("Reason").Op("=").Lit("unspecified"),
+				),
+				If(Id("result").Dot("Allow")).Block(
+					Id("cancel").Call(),
+					Id("allowReason").Op("=").Id("result").Dot("Reason"),
+				).Else().Block(
+					Id("denyReasons").Op("=").Append(Id("denyReasons"), Id("result").Dot("Reason")),
+				),
+			).Line()
+
+			group.If(Id("allowReason").Op("!=").Lit("")).Block(
+				Return(RuntimeTrue().Call(Id("allowReason"))),
+			).Else().Block(
+				Id("result").Op(":=").Add(RuntimeFalse()).Call(Qual("strings", "Join").Call(Id("denyReasons"), Lit(", "))),
+				If(Id("result").Dot("Reason")).Op("==").Lit("").Block(
+					Id("result").Dot("Reason").Op("=").Lit("unspecified"),
+				),
+				Return(Id("result")),
+			)
 		})
 
 	file.Line()
@@ -112,21 +148,27 @@ func generateAuthorizerCase(group *Group, name string, perm string, sources []sc
 				for _, source := range sources {
 					group.Commentf("Source: %s - %s", source.Type, source.Name)
 					resolver, params := CallPermissionSource(source)
-					group.If(
-						Id("result").Op(":=").Add(RuntimeQueryOr()).Call(
+					group.Id("wg").Dot("Go").Call(Func().Params().Block(
+						Id("results").Op("<-").Add(RuntimeQuery()).Call(
 							Id("ctx"),
-							Add(RuntimeCacheKey()).Block(
-								Id("ActorKey").Op(":").Id("actor").Dot("ToucanKey").Call().Op(","),
-								Id("Resource").Op(":").Lit(name).Op(","),
-								Id("ResourceKey").Op(":").Id("resource").Dot("ToucanKey").Call().Op(","),
-								Id("SourceType").Op(":").Lit(source.Type).Op(","),
-								Id("SourceName").Op(":").Lit(source.Name).Op(","),
-							),
+							Add(RuntimeCacheKey()).BlockFunc(func(group *jen.Group) {
+								group.Id("ActorKey").Op(":")
+								switch source.Type {
+								case "role":
+									group.String().Call(Id("actor").Dot("ID")).Op(",")
+								case "attribute":
+									group.Lit("").Op(",")
+								}
+								group.Id("Resource").Op(":").Lit(name).Op(",")
+								group.Id("ResourceKey").Op(":").String().Call(Id("resource").Dot("ID")).Op(",")
+								group.Id("SourceType").Op(":").Lit(source.Type).Op(",")
+								group.Id("SourceName").Op(":").Lit(source.Name).Op(",")
+							}),
 							Func().Params().Add(RuntimeDecision()).BlockFunc(func(group *jen.Group) {
 								group.Return(Id("resolver").Dot(resolver).Add(params))
 							}),
-						).Op(";").Id("result").Dot("Allow").Block(Return(Id("result"))),
-					)
+						),
+					))
 					group.Line()
 				}
 			})

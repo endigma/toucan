@@ -40,6 +40,3 @@ func NewRepository(label string, public bool) *Repository {
 		Public: public,
 	}
 }
-
-func (u *User) ToucanKey() string       { return u.ID.String() }
-func (r *Repository) ToucanKey() string { return r.ID.String() }
