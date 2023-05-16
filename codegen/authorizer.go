@@ -13,6 +13,10 @@ var (
 	RuntimeTrue     = func() *Statement { return Qual("github.com/endigma/toucan/decision", "True") }
 	RuntimeFalse    = func() *Statement { return Qual("github.com/endigma/toucan/decision", "False") }
 	RuntimeError    = func() *Statement { return Qual("github.com/endigma/toucan/decision", "Error") }
+
+	RuntimeCache    = func() *Statement { return Qual("github.com/endigma/toucan/cache", "Cache") }
+	RuntimeCacheKey = func() *Statement { return Qual("github.com/endigma/toucan/cache", "CacheKey") }
+	RuntimeQueryOr  = func() *Statement { return Qual("github.com/endigma/toucan/cache", "QueryOr") }
 )
 
 func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.ResourceSchema) {
@@ -106,11 +110,22 @@ func generateAuthorizerCase(group *Group, name string, perm string, sources []sc
 		BlockFunc(
 			func(group *Group) {
 				for _, source := range sources {
-					resolver, params := CallPermissionSource(source)
-
 					group.Commentf("Source: %s - %s", source.Type, source.Name)
-					group.If(Id("result").Op(":=").Id("resolver").Dot(resolver).Add(params), Id("result").Dot("Allow")).Block(
-						Return(Id("result")),
+					resolver, params := CallPermissionSource(source)
+					group.If(
+						Id("result").Op(":=").Add(RuntimeQueryOr()).Call(
+							Id("ctx"),
+							Add(RuntimeCacheKey()).Block(
+								Id("ActorKey").Op(":").Id("actor").Dot("ToucanKey").Call().Op(","),
+								Id("Resource").Op(":").Lit(name).Op(","),
+								Id("ResourceKey").Op(":").Id("resource").Dot("ToucanKey").Call().Op(","),
+								Id("SourceType").Op(":").Lit(source.Type).Op(","),
+								Id("SourceName").Op(":").Lit(source.Name).Op(","),
+							),
+							Func().Params().Add(RuntimeDecision()).BlockFunc(func(group *jen.Group) {
+								group.Return(Id("resolver").Dot(resolver).Add(params))
+							}),
+						).Op(";").Id("result").Dot("Allow").Block(Return(Id("result"))),
 					)
 					group.Line()
 				}

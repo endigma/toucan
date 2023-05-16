@@ -4,6 +4,7 @@ package toucan
 import (
 	"context"
 	models "github.com/endigma/toucan/_examples/basic/models"
+	cache "github.com/endigma/toucan/cache"
 	decision "github.com/endigma/toucan/decision"
 )
 
@@ -18,7 +19,15 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 		switch action {
 		case RepositoryPermissionRead:
 			// Source: attribute - Public
-			if result := resolver.HasAttributePublic(ctx, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "repository",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "attribute",
+				SourceName:  "Public",
+			}, func() decision.Decision {
+				return resolver.HasAttributePublic(ctx, resource)
+			}); result.Allow {
 				return result
 			}
 
@@ -29,40 +38,96 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 		switch action {
 		case RepositoryPermissionRead:
 			// Source: role - Owner
-			if result := resolver.HasRoleOwner(ctx, actor, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "repository",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "role",
+				SourceName:  "Owner",
+			}, func() decision.Decision {
+				return resolver.HasRoleOwner(ctx, actor, resource)
+			}); result.Allow {
 				return result
 			}
 
 			// Source: role - Editor
-			if result := resolver.HasRoleEditor(ctx, actor, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "repository",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "role",
+				SourceName:  "Editor",
+			}, func() decision.Decision {
+				return resolver.HasRoleEditor(ctx, actor, resource)
+			}); result.Allow {
 				return result
 			}
 
 			// Source: role - Viewer
-			if result := resolver.HasRoleViewer(ctx, actor, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "repository",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "role",
+				SourceName:  "Viewer",
+			}, func() decision.Decision {
+				return resolver.HasRoleViewer(ctx, actor, resource)
+			}); result.Allow {
 				return result
 			}
 
 		case RepositoryPermissionPush:
 			// Source: role - Owner
-			if result := resolver.HasRoleOwner(ctx, actor, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "repository",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "role",
+				SourceName:  "Owner",
+			}, func() decision.Decision {
+				return resolver.HasRoleOwner(ctx, actor, resource)
+			}); result.Allow {
 				return result
 			}
 
 			// Source: role - Editor
-			if result := resolver.HasRoleEditor(ctx, actor, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "repository",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "role",
+				SourceName:  "Editor",
+			}, func() decision.Decision {
+				return resolver.HasRoleEditor(ctx, actor, resource)
+			}); result.Allow {
 				return result
 			}
 
 		case RepositoryPermissionDelete:
 			// Source: role - Owner
-			if result := resolver.HasRoleOwner(ctx, actor, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "repository",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "role",
+				SourceName:  "Owner",
+			}, func() decision.Decision {
+				return resolver.HasRoleOwner(ctx, actor, resource)
+			}); result.Allow {
 				return result
 			}
 
 		case RepositoryPermissionSnakeCase:
 			// Source: role - Owner
-			if result := resolver.HasRoleOwner(ctx, actor, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "repository",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "role",
+				SourceName:  "Owner",
+			}, func() decision.Decision {
+				return resolver.HasRoleOwner(ctx, actor, resource)
+			}); result.Allow {
 				return result
 			}
 
@@ -99,34 +164,82 @@ func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, actio
 		switch action {
 		case UserPermissionRead:
 			// Source: role - Admin
-			if result := resolver.HasRoleAdmin(ctx, actor, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "user",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "role",
+				SourceName:  "Admin",
+			}, func() decision.Decision {
+				return resolver.HasRoleAdmin(ctx, actor, resource)
+			}); result.Allow {
 				return result
 			}
 
 			// Source: role - Self
-			if result := resolver.HasRoleSelf(ctx, actor, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "user",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "role",
+				SourceName:  "Self",
+			}, func() decision.Decision {
+				return resolver.HasRoleSelf(ctx, actor, resource)
+			}); result.Allow {
 				return result
 			}
 
 			// Source: role - Viewer
-			if result := resolver.HasRoleViewer(ctx, actor, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "user",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "role",
+				SourceName:  "Viewer",
+			}, func() decision.Decision {
+				return resolver.HasRoleViewer(ctx, actor, resource)
+			}); result.Allow {
 				return result
 			}
 
 		case UserPermissionWrite:
 			// Source: role - Admin
-			if result := resolver.HasRoleAdmin(ctx, actor, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "user",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "role",
+				SourceName:  "Admin",
+			}, func() decision.Decision {
+				return resolver.HasRoleAdmin(ctx, actor, resource)
+			}); result.Allow {
 				return result
 			}
 
 			// Source: role - Self
-			if result := resolver.HasRoleSelf(ctx, actor, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "user",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "role",
+				SourceName:  "Self",
+			}, func() decision.Decision {
+				return resolver.HasRoleSelf(ctx, actor, resource)
+			}); result.Allow {
 				return result
 			}
 
 		case UserPermissionDelete:
 			// Source: role - Admin
-			if result := resolver.HasRoleAdmin(ctx, actor, resource); result.Allow {
+			if result := cache.QueryOr(ctx, cache.CacheKey{
+				ActorKey:    actor.ToucanKey(),
+				Resource:    "user",
+				ResourceKey: resource.ToucanKey(),
+				SourceType:  "role",
+				SourceName:  "Admin",
+			}, func() decision.Decision {
+				return resolver.HasRoleAdmin(ctx, actor, resource)
+			}); result.Allow {
 				return result
 			}
 
