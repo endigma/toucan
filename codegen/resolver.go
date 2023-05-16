@@ -14,7 +14,7 @@ func (gen *Generator) generateResourceResolver(file *File, resource schema.Resou
 		if len(resource.Roles) > 0 {
 			for _, role := range resource.Roles {
 				group.Id("HasRole"+pascal(role.Name)).Params(
-					Id("context").Qual("context", "Context"),
+					Id("ctx").Qual("context", "Context"),
 					Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 					Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name),
 				).Add(RuntimeDecision())
@@ -25,7 +25,7 @@ func (gen *Generator) generateResourceResolver(file *File, resource schema.Resou
 		if len(resource.Attributes) > 0 {
 			for _, attribute := range resource.Attributes {
 				group.Id("HasAttribute"+pascal(attribute.Name)).Params(
-					Id("context").Qual("context", "Context"),
+					Id("ctx").Qual("context", "Context"),
 					Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name),
 				).Add(RuntimeDecision())
 			}
@@ -42,7 +42,7 @@ func (gen *Generator) generateGlobalResolver(file *File) {
 		if len(gen.Schema.Global.Roles) > 0 {
 			for _, role := range gen.Schema.Global.Roles {
 				group.Id("HasRole"+pascal(role.Name)).Params(
-					Id("context").Qual("context", "Context"),
+					Id("ctx").Qual("context", "Context"),
 					Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 				).Add(RuntimeDecision())
 			}
@@ -52,7 +52,7 @@ func (gen *Generator) generateGlobalResolver(file *File) {
 		if len(gen.Schema.Global.Attributes) > 0 {
 			for _, attribute := range gen.Schema.Global.Attributes {
 				group.Id("HasAttribute" + pascal(attribute.Name)).Params(
-					Id("context").Qual("context", "Context"),
+					Id("ctx").Qual("context", "Context"),
 				).Add(RuntimeDecision())
 			}
 		}
