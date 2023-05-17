@@ -8,6 +8,10 @@ import (
 	"github.com/endigma/toucan/decision"
 )
 
+func (e globalResolver) CacheKey(resource *struct{}) string {
+	return ""
+}
+
 func (g globalResolver) HasAttributeProfilesArePublic(context context.Context) decision.Decision {
 	return decision.False("attribute profiles are public")
 }

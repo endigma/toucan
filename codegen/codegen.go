@@ -37,16 +37,7 @@ func (gen *Generator) Generate() error {
 
 		// Generate authorizer
 		gen.generateResourceAuthorizer(authorizerFile, resource)
-
-		// Generate filter
-		gen.generateResourceFilter(authorizerFile, resource)
 	}
-
-	gen.generateGlobalTypes(typesFile)
-
-	gen.generateGlobalResolver(resolverFile)
-
-	gen.generateGlobalAuthorizer(authorizerFile)
 
 	if err := typesFile.Save(filepath.Join(gen.Output.Path + "/types.go")); err != nil {
 		return fmt.Errorf("failed to save file: %w", err)

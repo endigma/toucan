@@ -3,18 +3,11 @@ package schema
 type Schema struct {
 	Actor     Model            `hcl:"actor,optional" validate:"required"`
 	Resources []ResourceSchema `hcl:"resource,block" mod:"dive" validate:"required,unique=Model,unique=Name,dive"`
-	Global    GlobalSchema     `hcl:"global,block" validate:"required,dive"`
-}
-
-type GlobalSchema struct {
-	Permissions []string          `hcl:"permissions" mod:"dive,trim,snake" validate:"unique,dive,required"`
-	Roles       []RoleSchema      `hcl:"role,block" mod:"dive" validate:"unique=Name,dive,required"`
-	Attributes  []AttributeSchema `hcl:"attribute,block" mod:"dive" validate:"unique=Name,dive,required"`
 }
 
 type ResourceSchema struct {
 	Name  string `hcl:"name,label" mod:"trim,snake" validate:"required,validName,notReserved"`
-	Model Model  `hcl:"model" mod:"trim" validate:"required,dive"`
+	Model *Model `hcl:"model,optional" mod:"trim"`
 
 	Permissions []string `hcl:"permissions" mod:"dive,trim,snake" validate:"unique,dive,required"`
 

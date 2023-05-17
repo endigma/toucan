@@ -15,16 +15,6 @@ func (gen *Generator) generateResourceTypes(file *File, resource schema.Resource
 	file.Line()
 }
 
-func (gen *Generator) generateGlobalTypes(file *File) {
-	// Generate permissions enum
-	if len(gen.Schema.Global.Permissions) > 0 {
-		enumGen := newEnumGenerator("GlobalPermission", gen.Schema.Global.Permissions, EnumGeneratorFeatures{})
-		enumGen.Generate(file.Group)
-	}
-
-	file.Line()
-}
-
 type enumGenerator struct {
 	enumName   string
 	parserName string
@@ -135,7 +125,7 @@ func (gen *enumGenerator) generateParser(group *Group) {
 		).Block(Return(Id("x"), Nil())),
 		Line(),
 		Return(
-			Id(gen.enumName).Call(Lit("")),
+			Lit(""),
 			Qual("fmt", "Errorf").Call(Lit("%s is %w"), Id("s"), Id("ErrInvalid"+gen.enumName)),
 		),
 	).Line()

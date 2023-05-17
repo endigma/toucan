@@ -5,8 +5,15 @@ import (
 	"github.com/samber/lo"
 )
 
+type PermissionType string
+
+const (
+	PermissionTypeRole      PermissionType = "role"
+	PermissionTypeAttribute PermissionType = "attribute"
+)
+
 type PermissionSource struct {
-	Type string // role, attribute
+	Type PermissionType // role, attribute
 	Name string
 }
 
@@ -16,7 +23,7 @@ func GetRoleSources(permission string, roles []RoleSchema) []PermissionSource {
 	for _, role := range roles {
 		if lo.Contains(role.Permissions, permission) {
 			sources = append(sources, PermissionSource{
-				Type: "role",
+				Type: PermissionTypeRole,
 				Name: strcase.ToCamel(strcase.ToCamel(role.Name)),
 			})
 		}
@@ -31,7 +38,7 @@ func GetAttributeSources(permission string, attributes []AttributeSchema) []Perm
 	for _, attr := range attributes {
 		if lo.Contains(attr.Permissions, permission) {
 			sources = append(sources, PermissionSource{
-				Type: "attribute",
+				Type: PermissionTypeAttribute,
 				Name: strcase.ToCamel(strcase.ToCamel(attr.Name)),
 			})
 		}

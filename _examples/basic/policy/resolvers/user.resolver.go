@@ -8,6 +8,10 @@ import (
 	"github.com/endigma/toucan/decision"
 )
 
+func (e userResolver) CacheKey(resource *models.User) string {
+	return ""
+}
+
 func (e userResolver) HasRoleAdmin(context context.Context, actor *models.User, resource *models.User) decision.Decision {
 	return decision.True("")
 }

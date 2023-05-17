@@ -12,6 +12,7 @@ require (
 	github.com/imdario/mergo v0.3.15
 	github.com/samber/lo v1.38.1
 	github.com/stretchr/testify v1.8.2
+	golang.org/x/sync v0.2.0
 )
 
 require (

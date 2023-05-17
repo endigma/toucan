@@ -22,29 +22,23 @@ func pascal(s string) string {
 	return strcase.ToCamel(s)
 }
 
-func paramsForAuthorizer(actor schema.Model, resource schema.ResourceSchema) []jen.Code {
-	return []jen.Code{
-		jen.Id("ctx").Qual("context", "Context"),
-		jen.Id("actor").Op("*").Qual(actor.Path, actor.Name),
-		jen.Id("action").Id(pascal(resource.Name) + "Permission"),
-		jen.Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name),
-	}
-}
+func paramsForAuthorizer(actor schema.Model, resource schema.ResourceSchema) func(*jen.Group) {
+	return func(group *jen.Group) {
+		group.Id("ctx").Qual("context", "Context")
+		group.Id("actor").Op("*").Qual(actor.Path, actor.Name)
+		group.Id("action").Id(pascal(resource.Name) + "Permission")
 
-func paramsForFilter(actor schema.Model, resource schema.ResourceSchema) []jen.Code {
-	return []jen.Code{
-		jen.Id("ctx").Qual("context", "Context"),
-		jen.Id("actor").Op("*").Qual(actor.Path, actor.Name),
-		jen.Id("action").Id(pascal(resource.Name) + "Permission"),
-		jen.Id("resources").Index().Op("*").Qual(resource.Model.Path, resource.Model.Name),
+		if resource.Model != nil {
+			group.Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name)
+		}
 	}
 }
 
 func CallGlobalSource(source schema.PermissionSource) (string, *jen.Statement) {
 	switch source.Type {
-	case "role":
+	case schema.PermissionTypeRole:
 		return "HasRole" + pascal(source.Name), jen.Call(jen.Id("ctx"), jen.Id("actor"))
-	case "attribute":
+	case schema.PermissionTypeAttribute:
 		return "HasAttribute" + pascal(source.Name), jen.Call(jen.Id("ctx"))
 	}
 
@@ -53,9 +47,9 @@ func CallGlobalSource(source schema.PermissionSource) (string, *jen.Statement) {
 
 func CallPermissionSource(source schema.PermissionSource) (string, *jen.Statement) {
 	switch source.Type {
-	case "role":
+	case schema.PermissionTypeRole:
 		return "HasRole" + pascal(source.Name), jen.Call(jen.Id("ctx"), jen.Id("actor"), jen.Id("resource"))
-	case "attribute":
+	case schema.PermissionTypeAttribute:
 		return "HasAttribute" + pascal(source.Name), jen.Call(jen.Id("ctx"), jen.Id("resource"))
 	}
 
