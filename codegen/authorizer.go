@@ -136,7 +136,7 @@ func generateAuthorizerCase(group *Group, name string, perm string, sources []sc
 										s.Lit("")
 									}
 								}).Op(",")
-								group.Id("SourceType").Op(":").Lit(source.Type).Op(",")
+								group.Id("SourceType").Op(":").Lit(string(source.Type)).Op(",")
 								group.Id("SourceName").Op(":").Lit(source.Name).Op(",")
 							}),
 							Func().Params().Add(RuntimeDecision()).BlockFunc(func(group *Group) {
