@@ -10,8 +10,12 @@ import (
 	"strings"
 )
 
-func (a Authorizer) AuthorizeGlobal(ctx context.Context, actor *models.User, action GlobalPermission, resource *struct{}) decision.Decision {
+func (a Authorizer) AuthorizeGlobal(ctx context.Context, actor *models.User, action GlobalPermission) decision.Decision {
 	resolver := a.Global()
+
+	if !action.Valid() {
+		return decision.Error(ErrInvalidGlobalPermission)
+	}
 
 	var cancel func()
 	ctx, cancel = context.WithCancel(ctx)
@@ -21,30 +25,23 @@ func (a Authorizer) AuthorizeGlobal(ctx context.Context, actor *models.User, act
 
 	var wg conc.WaitGroup
 
-	if !action.Valid() {
-		return decision.Error(ErrInvalidGlobalPermission)
-	}
-
-	if resource != nil {
-		switch action {
-		case GlobalPermissionReadAllProfiles:
-			// Source: attribute - ProfilesArePublic
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    "",
-					Resource:    "global",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "attribute",
-					SourceName:  "ProfilesArePublic",
-				}, func() decision.Decision {
-					return resolver.HasAttributeProfilesArePublic(ctx, resource)
-				})
+	switch action {
+	case GlobalPermissionReadAllProfiles:
+		// Source: attribute - ProfilesArePublic
+		wg.Go(func() {
+			results <- cache.Query(ctx, cache.CacheKey{
+				ActorKey:    "",
+				Resource:    "global",
+				ResourceKey: "",
+				SourceType:  "attribute",
+				SourceName:  "ProfilesArePublic",
+			}, func() decision.Decision {
+				return resolver.HasAttributeProfilesArePublic(ctx)
 			})
+		})
 
-		}
 	}
-
-	if resource != nil && actor != nil {
+	if actor != nil {
 		switch action {
 		case GlobalPermissionReadAllUsers:
 			// Source: role - Admin
@@ -52,11 +49,11 @@ func (a Authorizer) AuthorizeGlobal(ctx context.Context, actor *models.User, act
 				results <- cache.Query(ctx, cache.CacheKey{
 					ActorKey:    a.CacheKey(actor),
 					Resource:    "global",
-					ResourceKey: resolver.CacheKey(resource),
+					ResourceKey: "",
 					SourceType:  "role",
 					SourceName:  "Admin",
 				}, func() decision.Decision {
-					return resolver.HasRoleAdmin(ctx, actor, resource)
+					return resolver.HasRoleAdmin(ctx, actor)
 				})
 			})
 
@@ -66,11 +63,11 @@ func (a Authorizer) AuthorizeGlobal(ctx context.Context, actor *models.User, act
 				results <- cache.Query(ctx, cache.CacheKey{
 					ActorKey:    a.CacheKey(actor),
 					Resource:    "global",
-					ResourceKey: resolver.CacheKey(resource),
+					ResourceKey: "",
 					SourceType:  "role",
 					SourceName:  "Admin",
 				}, func() decision.Decision {
-					return resolver.HasRoleAdmin(ctx, actor, resource)
+					return resolver.HasRoleAdmin(ctx, actor)
 				})
 			})
 
@@ -110,6 +107,13 @@ func (a Authorizer) AuthorizeGlobal(ctx context.Context, actor *models.User, act
 func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resource *models.Repository) decision.Decision {
 	resolver := a.Repository()
 
+	if !action.Valid() {
+		return decision.Error(ErrInvalidRepositoryPermission)
+	}
+
+	if resource == nil {
+		return decision.False("unmatched")
+	}
 	var cancel func()
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
@@ -118,30 +122,23 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 
 	var wg conc.WaitGroup
 
-	if !action.Valid() {
-		return decision.Error(ErrInvalidRepositoryPermission)
-	}
-
-	if resource != nil {
-		switch action {
-		case RepositoryPermissionRead:
-			// Source: attribute - Public
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    "",
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "attribute",
-					SourceName:  "Public",
-				}, func() decision.Decision {
-					return resolver.HasAttributePublic(ctx, resource)
-				})
+	switch action {
+	case RepositoryPermissionRead:
+		// Source: attribute - Public
+		wg.Go(func() {
+			results <- cache.Query(ctx, cache.CacheKey{
+				ActorKey:    "",
+				Resource:    "repository",
+				ResourceKey: resolver.CacheKey(resource),
+				SourceType:  "attribute",
+				SourceName:  "Public",
+			}, func() decision.Decision {
+				return resolver.HasAttributePublic(ctx, resource)
 			})
+		})
 
-		}
 	}
-
-	if resource != nil && actor != nil {
+	if actor != nil {
 		switch action {
 		case RepositoryPermissionRead:
 			// Source: role - Owner
@@ -274,6 +271,13 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, action UserPermission, resource *models.User) decision.Decision {
 	resolver := a.User()
 
+	if !action.Valid() {
+		return decision.Error(ErrInvalidUserPermission)
+	}
+
+	if resource == nil {
+		return decision.False("unmatched")
+	}
 	var cancel func()
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
@@ -282,11 +286,7 @@ func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, actio
 
 	var wg conc.WaitGroup
 
-	if !action.Valid() {
-		return decision.Error(ErrInvalidUserPermission)
-	}
-
-	if resource != nil && actor != nil {
+	if actor != nil {
 		switch action {
 		case UserPermissionRead:
 			// Source: role - Admin
@@ -407,18 +407,28 @@ type Authorizer struct {
 	Resolver
 }
 
-func (a Authorizer) Authorize(ctx context.Context, actor *models.User, permission string, resource any) decision.Decision {
-	switch resource.(type) {
-	case *models.Repository:
+func (a Authorizer) Authorize(ctx context.Context, actor *models.User, permission string, resourceType string, resource any) decision.Decision {
+	switch resourceType {
+	case "global":
+		perm, err := ParseGlobalPermission(permission)
+		if err != nil {
+			return decision.Error(err)
+		}
+		return a.AuthorizeGlobal(ctx, actor, perm)
+	case "repository":
 		perm, err := ParseRepositoryPermission(permission)
-		if err == nil {
-			return a.AuthorizeRepository(ctx, actor, perm, resource.(*models.Repository))
+		resource, _ := resource.(*models.Repository)
+		if err != nil {
+			return decision.Error(err)
 		}
-	case *models.User:
+		return a.AuthorizeRepository(ctx, actor, perm, resource)
+	case "user":
 		perm, err := ParseUserPermission(permission)
-		if err == nil {
-			return a.AuthorizeUser(ctx, actor, perm, resource.(*models.User))
+		resource, _ := resource.(*models.User)
+		if err != nil {
+			return decision.Error(err)
 		}
+		return a.AuthorizeUser(ctx, actor, perm, resource)
 	}
 
 	return decision.False("unmatched")

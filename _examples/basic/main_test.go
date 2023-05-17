@@ -85,8 +85,8 @@ func TestAuthorization(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := authorizer.Authorize(ctx, tc.user, tc.action, tc.repo)
-			assert.Equal(t, result.Allow, tc.expected)
+			result := authorizer.Authorize(ctx, tc.user, tc.action, "repository", tc.repo)
+			assert.Equal(t, result.Allow, tc.expected, "Reason: %s", result.Reason)
 		})
 	}
 }

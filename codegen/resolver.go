@@ -12,8 +12,6 @@ func (gen *Generator) generateResourceResolver(file *File, resource schema.Resou
 	file.Type().Id(pascal(resource.Name) + "Resolver").InterfaceFunc(func(group *Group) {
 		if resource.Model != nil {
 			group.Id("CacheKey").Params(Id("resource").Op("*").Qual(resource.Model.Tuple())).Id("string").Line()
-		} else {
-			group.Id("CacheKey").Params(Id("resource").Op("*").Struct()).Id("string").Line()
 		}
 		// Role resolver
 		if len(resource.Roles) > 0 {
@@ -23,8 +21,6 @@ func (gen *Generator) generateResourceResolver(file *File, resource schema.Resou
 					group.Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name)
 					if resource.Model != nil {
 						group.Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name)
-					} else {
-						group.Id("resource").Op("*").Struct()
 					}
 				}).Add(RuntimeDecision())
 			}
@@ -37,8 +33,6 @@ func (gen *Generator) generateResourceResolver(file *File, resource schema.Resou
 					group.Id("ctx").Qual("context", "Context")
 					if resource.Model != nil {
 						group.Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name)
-					} else {
-						group.Id("resource").Op("*").Struct()
 					}
 				}).Add(RuntimeDecision())
 			}

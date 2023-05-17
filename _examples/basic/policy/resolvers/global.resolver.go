@@ -12,11 +12,11 @@ func (e globalResolver) CacheKey(resource *struct{}) string {
 	return ""
 }
 
-func (g globalResolver) HasAttributeProfilesArePublic(context context.Context, resource *struct{}) decision.Decision {
+func (g globalResolver) HasAttributeProfilesArePublic(context context.Context) decision.Decision {
 	return decision.False("attribute profiles are public")
 }
 
-func (g globalResolver) HasRoleAdmin(context context.Context, actor *models.User, resource *struct{}) decision.Decision {
+func (g globalResolver) HasRoleAdmin(context context.Context, actor *models.User) decision.Decision {
 	if actor.GlobalAdmin {
 		return decision.True("actor is admin")
 	}

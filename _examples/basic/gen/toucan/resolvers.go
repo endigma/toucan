@@ -9,10 +9,8 @@ import (
 
 // Resolver for resource `global`
 type GlobalResolver interface {
-	CacheKey(resource *struct{}) string
-
-	HasRoleAdmin(ctx context.Context, actor *models.User, resource *struct{}) decision.Decision
-	HasAttributeProfilesArePublic(ctx context.Context, resource *struct{}) decision.Decision
+	HasRoleAdmin(ctx context.Context, actor *models.User) decision.Decision
+	HasAttributeProfilesArePublic(ctx context.Context) decision.Decision
 }
 
 // Resolver for resource `repository`
