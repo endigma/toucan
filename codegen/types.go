@@ -135,7 +135,7 @@ func (gen *enumGenerator) generateParser(group *Group) {
 		).Block(Return(Id("x"), Nil())),
 		Line(),
 		Return(
-			Id(gen.enumName).Call(Lit("")),
+			Lit(""),
 			Qual("fmt", "Errorf").Call(Lit("%s is %w"), Id("s"), Id("ErrInvalid"+gen.enumName)),
 		),
 	).Line()
