@@ -17,7 +17,7 @@ func TestSchema(t *testing.T) {
 			Resources: []schema.ResourceSchema{
 				{
 					Name:        "Post",
-					Model:       schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
+					Model:       &schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
 					Permissions: []string{"Read", "Write"},
 					Roles: []schema.RoleSchema{
 						{
@@ -38,7 +38,7 @@ func TestSchema(t *testing.T) {
 			Resources: []schema.ResourceSchema{
 				{
 					Name:        "Post",
-					Model:       schema.Model{"github.com/endigma/toucan/_examples/basic", "9ost"},
+					Model:       &schema.Model{"github.com/endigma/toucan/_examples/basic", "9ost"},
 					Permissions: []string{"read", "write"},
 					Roles: []schema.RoleSchema{
 						{
@@ -59,7 +59,7 @@ func TestSchema(t *testing.T) {
 			Resources: []schema.ResourceSchema{
 				{
 					Name:        "Post",
-					Model:       schema.Model{"github.com/edd333", "Post"},
+					Model:       &schema.Model{"github.com/edd333", "Post"},
 					Permissions: []string{"read", "write"},
 					Roles: []schema.RoleSchema{
 						{
@@ -77,7 +77,7 @@ func TestSchema(t *testing.T) {
 	t.Run("duplicate resource names", func(t *testing.T) {
 		resource := schema.ResourceSchema{
 			Name:        "Post",
-			Model:       schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
+			Model:       &schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
 			Permissions: []string{"read", "write"},
 			Roles: []schema.RoleSchema{
 				{
@@ -109,7 +109,7 @@ func TestSchema(t *testing.T) {
 			Resources: []schema.ResourceSchema{
 				{
 					Name:        "Post",
-					Model:       schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
+					Model:       &schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
 					Permissions: []string{"read", "write"},
 					Roles:       []schema.RoleSchema{role, role},
 				},
@@ -130,7 +130,7 @@ func TestSchema(t *testing.T) {
 			Resources: []schema.ResourceSchema{
 				{
 					Name:        "Post",
-					Model:       schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
+					Model:       &schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
 					Permissions: []string{"read", "write"},
 					Attributes:  []schema.AttributeSchema{attr, attr},
 				},
@@ -146,7 +146,7 @@ func TestSchema(t *testing.T) {
 			Resources: []schema.ResourceSchema{
 				{
 					Name:        "Post",
-					Model:       schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
+					Model:       &schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
 					Permissions: []string{"read", "read"},
 				},
 			},
@@ -161,7 +161,7 @@ func TestSchema(t *testing.T) {
 			Resources: []schema.ResourceSchema{
 				{
 					Name:        "Post",
-					Model:       schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
+					Model:       &schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
 					Permissions: []string{"read", "write", "read"},
 					Roles: []schema.RoleSchema{
 						{
@@ -182,7 +182,7 @@ func TestSchema(t *testing.T) {
 			Resources: []schema.ResourceSchema{
 				{
 					Name:        "Post",
-					Model:       schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
+					Model:       &schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
 					Permissions: []string{"read", "write", "read"},
 					Attributes: []schema.AttributeSchema{
 						{
@@ -203,7 +203,7 @@ func TestSchema(t *testing.T) {
 			Resources: []schema.ResourceSchema{
 				{
 					Name:  "Authorizer",
-					Model: schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
+					Model: &schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
 				},
 			},
 		}
@@ -217,7 +217,7 @@ func TestSchema(t *testing.T) {
 			Resources: []schema.ResourceSchema{
 				{
 					Name:  "Post",
-					Model: schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
+					Model: &schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
 					Roles: []schema.RoleSchema{
 						{
 							Name: "admin",
@@ -236,7 +236,7 @@ func TestSchema(t *testing.T) {
 			Resources: []schema.ResourceSchema{
 				{
 					Name:  "Post",
-					Model: schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
+					Model: &schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
 					Attributes: []schema.AttributeSchema{
 						{
 							Name: "admin",
