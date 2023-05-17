@@ -7,8 +7,18 @@ import (
 	decision "github.com/endigma/toucan/decision"
 )
 
+// Resolver for resource `global`
+type GlobalResolver interface {
+	CacheKey(resource *struct{}) string
+
+	HasRoleAdmin(ctx context.Context, actor *models.User, resource *struct{}) decision.Decision
+	HasAttributeProfilesArePublic(ctx context.Context, resource *struct{}) decision.Decision
+}
+
 // Resolver for resource `repository`
 type RepositoryResolver interface {
+	CacheKey(resource *models.Repository) string
+
 	HasRoleOwner(ctx context.Context, actor *models.User, resource *models.Repository) decision.Decision
 	HasRoleEditor(ctx context.Context, actor *models.User, resource *models.Repository) decision.Decision
 	HasRoleViewer(ctx context.Context, actor *models.User, resource *models.Repository) decision.Decision
@@ -17,21 +27,18 @@ type RepositoryResolver interface {
 
 // Resolver for resource `user`
 type UserResolver interface {
+	CacheKey(resource *models.User) string
+
 	HasRoleAdmin(ctx context.Context, actor *models.User, resource *models.User) decision.Decision
 	HasRoleSelf(ctx context.Context, actor *models.User, resource *models.User) decision.Decision
 	HasRoleViewer(ctx context.Context, actor *models.User, resource *models.User) decision.Decision
 }
 
-// Resolver for global scope
-type GlobalResolver interface {
-	HasRoleAdmin(ctx context.Context, actor *models.User) decision.Decision
-	HasAttributeProfilesArePublic(ctx context.Context) decision.Decision
-}
-
 // Root Resolver
 type Resolver interface {
-	Global() GlobalResolver
+	CacheKey(actor *models.User) string
 
+	Global() GlobalResolver
 	Repository() RepositoryResolver
 	User() UserResolver
 }

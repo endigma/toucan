@@ -10,6 +10,103 @@ import (
 	"strings"
 )
 
+func (a Authorizer) AuthorizeGlobal(ctx context.Context, actor *models.User, action GlobalPermission, resource *struct{}) decision.Decision {
+	resolver := a.Global()
+
+	var cancel func()
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+
+	results := make(chan decision.Decision)
+
+	var wg conc.WaitGroup
+
+	if !action.Valid() {
+		return decision.Error(ErrInvalidGlobalPermission)
+	}
+
+	if resource != nil {
+		switch action {
+		case GlobalPermissionReadAllProfiles:
+			// Source: attribute - ProfilesArePublic
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    "",
+					Resource:    "global",
+					ResourceKey: resolver.CacheKey(resource),
+					SourceType:  "attribute",
+					SourceName:  "ProfilesArePublic",
+				}, func() decision.Decision {
+					return resolver.HasAttributeProfilesArePublic(ctx, resource)
+				})
+			})
+
+		}
+	}
+
+	if resource != nil && actor != nil {
+		switch action {
+		case GlobalPermissionReadAllUsers:
+			// Source: role - Admin
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    a.CacheKey(actor),
+					Resource:    "global",
+					ResourceKey: resolver.CacheKey(resource),
+					SourceType:  "role",
+					SourceName:  "Admin",
+				}, func() decision.Decision {
+					return resolver.HasRoleAdmin(ctx, actor, resource)
+				})
+			})
+
+		case GlobalPermissionWriteAllUsers:
+			// Source: role - Admin
+			wg.Go(func() {
+				results <- cache.Query(ctx, cache.CacheKey{
+					ActorKey:    a.CacheKey(actor),
+					Resource:    "global",
+					ResourceKey: resolver.CacheKey(resource),
+					SourceType:  "role",
+					SourceName:  "Admin",
+				}, func() decision.Decision {
+					return resolver.HasRoleAdmin(ctx, actor, resource)
+				})
+			})
+
+		}
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var allowReason string
+	var denyReasons []string
+	for result := range results {
+		if result.Reason == "" {
+			result.Reason = "unspecified"
+		}
+		if result.Allow {
+			cancel()
+			allowReason = result.Reason
+		} else {
+			denyReasons = append(denyReasons, result.Reason)
+		}
+	}
+
+	if allowReason != "" {
+		return decision.True(allowReason)
+	} else {
+		result := decision.False(strings.Join(denyReasons, ", "))
+		if result.Reason == "" {
+			result.Reason = "unspecified"
+		}
+		return result
+	}
+}
+
 func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resource *models.Repository) decision.Decision {
 	resolver := a.Repository()
 
@@ -33,7 +130,7 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 				results <- cache.Query(ctx, cache.CacheKey{
 					ActorKey:    "",
 					Resource:    "repository",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "attribute",
 					SourceName:  "Public",
 				}, func() decision.Decision {
@@ -50,9 +147,9 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 			// Source: role - Owner
 			wg.Go(func() {
 				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    actor.ToucanKey(),
+					ActorKey:    a.CacheKey(actor),
 					Resource:    "repository",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "role",
 					SourceName:  "Owner",
 				}, func() decision.Decision {
@@ -63,9 +160,9 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 			// Source: role - Editor
 			wg.Go(func() {
 				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    actor.ToucanKey(),
+					ActorKey:    a.CacheKey(actor),
 					Resource:    "repository",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "role",
 					SourceName:  "Editor",
 				}, func() decision.Decision {
@@ -76,9 +173,9 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 			// Source: role - Viewer
 			wg.Go(func() {
 				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    actor.ToucanKey(),
+					ActorKey:    a.CacheKey(actor),
 					Resource:    "repository",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "role",
 					SourceName:  "Viewer",
 				}, func() decision.Decision {
@@ -90,9 +187,9 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 			// Source: role - Owner
 			wg.Go(func() {
 				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    actor.ToucanKey(),
+					ActorKey:    a.CacheKey(actor),
 					Resource:    "repository",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "role",
 					SourceName:  "Owner",
 				}, func() decision.Decision {
@@ -103,9 +200,9 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 			// Source: role - Editor
 			wg.Go(func() {
 				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    actor.ToucanKey(),
+					ActorKey:    a.CacheKey(actor),
 					Resource:    "repository",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "role",
 					SourceName:  "Editor",
 				}, func() decision.Decision {
@@ -117,9 +214,9 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 			// Source: role - Owner
 			wg.Go(func() {
 				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    actor.ToucanKey(),
+					ActorKey:    a.CacheKey(actor),
 					Resource:    "repository",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "role",
 					SourceName:  "Owner",
 				}, func() decision.Decision {
@@ -131,9 +228,9 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 			// Source: role - Owner
 			wg.Go(func() {
 				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    actor.ToucanKey(),
+					ActorKey:    a.CacheKey(actor),
 					Resource:    "repository",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "role",
 					SourceName:  "Owner",
 				}, func() decision.Decision {
@@ -211,9 +308,9 @@ func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, actio
 			// Source: role - Admin
 			wg.Go(func() {
 				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    actor.ToucanKey(),
+					ActorKey:    a.CacheKey(actor),
 					Resource:    "user",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "role",
 					SourceName:  "Admin",
 				}, func() decision.Decision {
@@ -224,9 +321,9 @@ func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, actio
 			// Source: role - Self
 			wg.Go(func() {
 				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    actor.ToucanKey(),
+					ActorKey:    a.CacheKey(actor),
 					Resource:    "user",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "role",
 					SourceName:  "Self",
 				}, func() decision.Decision {
@@ -237,9 +334,9 @@ func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, actio
 			// Source: role - Viewer
 			wg.Go(func() {
 				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    actor.ToucanKey(),
+					ActorKey:    a.CacheKey(actor),
 					Resource:    "user",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "role",
 					SourceName:  "Viewer",
 				}, func() decision.Decision {
@@ -251,9 +348,9 @@ func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, actio
 			// Source: role - Admin
 			wg.Go(func() {
 				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    actor.ToucanKey(),
+					ActorKey:    a.CacheKey(actor),
 					Resource:    "user",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "role",
 					SourceName:  "Admin",
 				}, func() decision.Decision {
@@ -264,9 +361,9 @@ func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, actio
 			// Source: role - Self
 			wg.Go(func() {
 				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    actor.ToucanKey(),
+					ActorKey:    a.CacheKey(actor),
 					Resource:    "user",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "role",
 					SourceName:  "Self",
 				}, func() decision.Decision {
@@ -278,9 +375,9 @@ func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, actio
 			// Source: role - Admin
 			wg.Go(func() {
 				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    actor.ToucanKey(),
+					ActorKey:    a.CacheKey(actor),
 					Resource:    "user",
-					ResourceKey: resource.ToucanKey(),
+					ResourceKey: resolver.CacheKey(resource),
 					SourceType:  "role",
 					SourceName:  "Admin",
 				}, func() decision.Decision {
@@ -335,36 +432,6 @@ func (a Authorizer) FilterUser(ctx context.Context, actor *models.User, action U
 	}
 
 	return allowedResolvers, nil
-}
-
-func (a Authorizer) AuthorizeGlobal(ctx context.Context, actor *models.User, action GlobalPermission) decision.Decision {
-	resolver := a.Global()
-
-	if !action.Valid() {
-		return decision.Error(ErrInvalidGlobalPermission)
-	}
-
-	switch action {
-	case GlobalPermissionReadAllUsers:
-		// Source: role - Admin
-		if result := resolver.HasRoleAdmin(ctx, actor); result.Allow {
-			return result
-		}
-
-	case GlobalPermissionWriteAllUsers:
-		// Source: role - Admin
-		if result := resolver.HasRoleAdmin(ctx, actor); result.Allow {
-			return result
-		}
-
-	case GlobalPermissionReadAllProfiles:
-		// Source: attribute - ProfilesArePublic
-		if result := resolver.HasAttributeProfilesArePublic(ctx); result.Allow {
-			return result
-		}
-
-	}
-	return decision.False("unmatched")
 }
 
 // Authorizer

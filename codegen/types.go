@@ -15,16 +15,6 @@ func (gen *Generator) generateResourceTypes(file *File, resource schema.Resource
 	file.Line()
 }
 
-func (gen *Generator) generateGlobalTypes(file *File) {
-	// Generate permissions enum
-	if len(gen.Schema.Global.Permissions) > 0 {
-		enumGen := newEnumGenerator("GlobalPermission", gen.Schema.Global.Permissions, EnumGeneratorFeatures{})
-		enumGen.Generate(file.Group)
-	}
-
-	file.Line()
-}
-
 type enumGenerator struct {
 	enumName   string
 	parserName string

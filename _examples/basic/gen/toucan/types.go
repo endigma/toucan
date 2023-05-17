@@ -8,6 +8,46 @@ import (
 	"strings"
 )
 
+type GlobalPermission string
+
+const (
+	GlobalPermissionReadAllUsers    GlobalPermission = "read_all_users"
+	GlobalPermissionWriteAllUsers   GlobalPermission = "write_all_users"
+	GlobalPermissionReadAllProfiles GlobalPermission = "read_all_profiles"
+)
+
+var (
+	ErrInvalidGlobalPermission = fmt.Errorf("not a valid GlobalPermission, try [%s]", strings.Join(globalPermissionNames, ", "))
+	ErrNilGlobalPermission     = errors.New("value is nil")
+)
+
+var (
+	globalPermissionMap = map[string]GlobalPermission{
+		"read_all_profiles": GlobalPermissionReadAllProfiles,
+		"read_all_users":    GlobalPermissionReadAllUsers,
+		"write_all_users":   GlobalPermissionWriteAllUsers,
+	}
+	globalPermissionNames = []string{string(GlobalPermissionReadAllUsers), string(GlobalPermissionWriteAllUsers), string(GlobalPermissionReadAllProfiles)}
+)
+
+func (s GlobalPermission) Valid() bool {
+	_, err := ParseGlobalPermission(string(s))
+	return err == nil
+}
+
+func ParseGlobalPermission(s string) (GlobalPermission, error) {
+	if x, ok := globalPermissionMap[s]; ok {
+		return x, nil
+	}
+
+	// Try to parse from snake case
+	if x, ok := globalPermissionMap[strcase.ToSnake(s)]; ok {
+		return x, nil
+	}
+
+	return "", fmt.Errorf("%s is %w", s, ErrInvalidGlobalPermission)
+}
+
 type RepositoryPermission string
 
 const (
@@ -47,7 +87,7 @@ func ParseRepositoryPermission(s string) (RepositoryPermission, error) {
 		return x, nil
 	}
 
-	return RepositoryPermission(""), fmt.Errorf("%s is %w", s, ErrInvalidRepositoryPermission)
+	return "", fmt.Errorf("%s is %w", s, ErrInvalidRepositoryPermission)
 }
 
 type UserPermission string
@@ -87,45 +127,5 @@ func ParseUserPermission(s string) (UserPermission, error) {
 		return x, nil
 	}
 
-	return UserPermission(""), fmt.Errorf("%s is %w", s, ErrInvalidUserPermission)
-}
-
-type GlobalPermission string
-
-const (
-	GlobalPermissionReadAllUsers    GlobalPermission = "read_all_users"
-	GlobalPermissionWriteAllUsers   GlobalPermission = "write_all_users"
-	GlobalPermissionReadAllProfiles GlobalPermission = "read_all_profiles"
-)
-
-var (
-	ErrInvalidGlobalPermission = fmt.Errorf("not a valid GlobalPermission, try [%s]", strings.Join(globalPermissionNames, ", "))
-	ErrNilGlobalPermission     = errors.New("value is nil")
-)
-
-var (
-	globalPermissionMap = map[string]GlobalPermission{
-		"read_all_profiles": GlobalPermissionReadAllProfiles,
-		"read_all_users":    GlobalPermissionReadAllUsers,
-		"write_all_users":   GlobalPermissionWriteAllUsers,
-	}
-	globalPermissionNames = []string{string(GlobalPermissionReadAllUsers), string(GlobalPermissionWriteAllUsers), string(GlobalPermissionReadAllProfiles)}
-)
-
-func (s GlobalPermission) Valid() bool {
-	_, err := ParseGlobalPermission(string(s))
-	return err == nil
-}
-
-func ParseGlobalPermission(s string) (GlobalPermission, error) {
-	if x, ok := globalPermissionMap[s]; ok {
-		return x, nil
-	}
-
-	// Try to parse from snake case
-	if x, ok := globalPermissionMap[strcase.ToSnake(s)]; ok {
-		return x, nil
-	}
-
-	return GlobalPermission(""), fmt.Errorf("%s is %w", s, ErrInvalidGlobalPermission)
+	return "", fmt.Errorf("%s is %w", s, ErrInvalidUserPermission)
 }
