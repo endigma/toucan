@@ -21,7 +21,6 @@ linters:
     - errorlint
     - exhaustive
     - exportloopref
-    - funlen
     - gci
     - gocheckcompilerdirectives
     - gochecknoinits
