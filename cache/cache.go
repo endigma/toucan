@@ -27,10 +27,12 @@ type CacheKey struct {
 
 func (c *CacheKey) string() string {
 	var sb strings.Builder
+
 	write := func(s string) {
 		if strings.ContainsRune(s, 0) {
 			panic("contained null byte")
 		}
+
 		sb.WriteString(s)
 		sb.WriteByte(0)
 	}
@@ -39,6 +41,7 @@ func (c *CacheKey) string() string {
 	write(c.ResourceKey)
 	write(c.SourceType)
 	write(c.SourceName)
+
 	return sb.String()
 }
 
@@ -46,6 +49,7 @@ func (c *Cache) query(keystr string) (decision.Decision, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	dec, ok := c.m[keystr]
+
 	return dec, ok
 }
 
@@ -57,6 +61,7 @@ func (c *Cache) insert(keystr string, dec decision.Decision) {
 
 func (c *Cache) Query(key CacheKey, fallback func() decision.Decision) decision.Decision {
 	keystr := key.string()
+
 	dec, ok := c.query(keystr)
 	if ok {
 		return dec
@@ -73,6 +78,7 @@ func (c *Cache) Query(key CacheKey, fallback func() decision.Decision) decision.
 	}
 
 	c.insert(keystr, dec)
+
 	return dec
 }
 
@@ -86,6 +92,7 @@ func NewContext(ctx context.Context) context.Context {
 
 func FromContext(ctx context.Context) *Cache {
 	c, _ := ctx.Value(ctxKey{}).(*Cache)
+
 	return c
 }
 
@@ -93,5 +100,6 @@ func Query(ctx context.Context, key CacheKey, fallback func() decision.Decision)
 	if c := FromContext(ctx); c != nil {
 		return c.Query(key, fallback)
 	}
+
 	return fallback()
 }

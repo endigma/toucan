@@ -27,18 +27,10 @@ func paramsForAuthorizer(actor schema.Model, resource schema.ResourceSchema) fun
 		group.Id("ctx").Qual("context", "Context")
 		group.Id("actor").Op("*").Qual(actor.Path, actor.Name)
 		group.Id("action").Id(pascal(resource.Name) + "Permission")
+
 		if resource.Model != nil {
 			group.Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name)
 		}
-	}
-}
-
-func paramsForFilter(actor schema.Model, resource schema.ResourceSchema) []jen.Code {
-	return []jen.Code{
-		jen.Id("ctx").Qual("context", "Context"),
-		jen.Id("actor").Op("*").Qual(actor.Path, actor.Name),
-		jen.Id("action").Id(pascal(resource.Name) + "Permission"),
-		jen.Id("resources").Index().Op("*").Qual(resource.Model.Path, resource.Model.Name),
 	}
 }
 

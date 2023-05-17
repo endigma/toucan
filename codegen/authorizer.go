@@ -122,9 +122,9 @@ func generateAuthorizerCase(group *Group, name string, perm string, sources []sc
 							Add(RuntimeCacheKey()).BlockFunc(func(group *Group) {
 								group.Id("ActorKey").Op(":").Do(func(s *Statement) {
 									switch source.Type {
-									case "role":
+									case schema.PermissionTypeRole:
 										s.Id("a").Dot("CacheKey").Call(Id("actor"))
-									case "attribute":
+									case schema.PermissionTypeAttribute:
 										s.Lit("")
 									}
 								}).Op(",")
@@ -144,9 +144,9 @@ func generateAuthorizerCase(group *Group, name string, perm string, sources []sc
 									Id("resolver").
 										Do(func(s *Statement) {
 											switch source.Type {
-											case "role":
+											case schema.PermissionTypeRole:
 												s.Dot("HasRole" + pascal(source.Name))
-											case "attribute":
+											case schema.PermissionTypeAttribute:
 												s.Dot("HasAttribute" + pascal(source.Name))
 											}
 										}).
@@ -191,7 +191,8 @@ func (gen *Generator) generateAuthorizerRoot(group *Group) {
 					List(Id("perm"), Id("err")).Op(":=").Id("Parse"+pascal(resource.Name)+"Permission").Call(Id("permission")),
 					Do(func(s *Statement) {
 						if resource.Model != nil {
-							s.List(Id("resource"), Op("_")).Op(":=").Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
+							s.List(Id("resource"), Op("_")).Op(":=").Id("resource").
+								Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
 						}
 					}),
 					If(Id("err").Op("!=").Nil()).Block(

@@ -44,6 +44,7 @@ func (gen *Generator) generateResolverRoot(group *Group) {
 	group.Comment("Root Resolver")
 	group.Type().Id("Resolver").InterfaceFunc(func(group *Group) {
 		group.Id("CacheKey").Params(Id("actor").Op("*").Qual(gen.Schema.Actor.Tuple())).Id("string").Line()
+
 		for _, resource := range gen.Schema.Resources {
 			group.Id(pascal(resource.Name)).Params().Id(pascal(resource.Name) + "Resolver")
 		}
