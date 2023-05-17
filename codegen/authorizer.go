@@ -108,36 +108,6 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 	file.Line()
 }
 
-func (gen *Generator) generateResourceFilter(file *File, resource schema.ResourceSchema) {
-	file.Func().
-		Params(Id("a").Id("Authorizer")).
-		Id("Filter"+pascal(resource.Name)).
-		ParamsFunc(paramsForFilter(gen.Schema.Actor, resource)).
-		Params(
-			Index().Op("*").Qual(resource.Model.Path, resource.Model.Name),
-			Error(),
-		).
-		BlockFunc(func(group *Group) {
-			group.If(Op("!").Id("action").Dot("Valid").Call()).Block(
-				Return(
-					Nil(), Id(fmt.Sprintf("ErrInvalid%sPermission", pascal(resource.Name))),
-				),
-			).Line()
-
-			group.Var().Id("allowedResolvers").Index().Op("*").Qual(resource.Model.Path, resource.Model.Name)
-			group.For(List(Id("_"), Id("resource")).Op(":=").Range().Id("resources")).
-				BlockFunc(func(group *Group) {
-					group.Id("result").Op(":=").Id("a").
-						Dot("Authorize"+pascal(resource.Name)).Call(Id("ctx"), Id("actor"), Id("action"), Id("resource"))
-
-					group.If(Id("result").Dot("Allow")).Block(Id("allowedResolvers").
-						Op("=").Id("append").Call(Id("allowedResolvers"), Id("resource")))
-				}).Line()
-			group.Return(Id("allowedResolvers"), Nil())
-		})
-	file.Line()
-}
-
 func generateAuthorizerCase(group *Group, name string, perm string, sources []schema.PermissionSource) {
 	group.Case(Id(pascal(name) + "Permission" + pascal(perm))).
 		BlockFunc(

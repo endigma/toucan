@@ -37,11 +37,6 @@ func (gen *Generator) Generate() error {
 
 		// Generate authorizer
 		gen.generateResourceAuthorizer(authorizerFile, resource)
-
-		// Generate filter
-		if resource.Model != nil {
-			gen.generateResourceFilter(authorizerFile, resource)
-		}
 	}
 
 	if err := typesFile.Save(filepath.Join(gen.Output.Path + "/types.go")); err != nil {

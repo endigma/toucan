@@ -271,22 +271,6 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 	}
 }
 
-func (a Authorizer) FilterRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resources []*models.Repository) ([]*models.Repository, error) {
-	if !action.Valid() {
-		return nil, ErrInvalidRepositoryPermission
-	}
-
-	var allowedResolvers []*models.Repository
-	for _, resource := range resources {
-		result := a.AuthorizeRepository(ctx, actor, action, resource)
-		if result.Allow {
-			allowedResolvers = append(allowedResolvers, resource)
-		}
-	}
-
-	return allowedResolvers, nil
-}
-
 func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, action UserPermission, resource *models.User) decision.Decision {
 	resolver := a.User()
 
@@ -416,22 +400,6 @@ func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, actio
 		}
 		return result
 	}
-}
-
-func (a Authorizer) FilterUser(ctx context.Context, actor *models.User, action UserPermission, resources []*models.User) ([]*models.User, error) {
-	if !action.Valid() {
-		return nil, ErrInvalidUserPermission
-	}
-
-	var allowedResolvers []*models.User
-	for _, resource := range resources {
-		result := a.AuthorizeUser(ctx, actor, action, resource)
-		if result.Allow {
-			allowedResolvers = append(allowedResolvers, resource)
-		}
-	}
-
-	return allowedResolvers, nil
 }
 
 // Authorizer

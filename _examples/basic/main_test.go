@@ -90,24 +90,3 @@ func TestAuthorization(t *testing.T) {
 		})
 	}
 }
-
-func TestFilter(t *testing.T) {
-	ctx := context.Background()
-
-	google := models.NewRepository("Google", true)
-	facebook := models.NewRepository("Facebook", false)
-
-	tom := models.NewUser("Tom", false, models.RepositoryRole{Role: "owner", Repo: facebook.ID})
-
-	authorizer := toucan.NewAuthorizer(resolvers.NewResolver())
-
-	allRepos := []*models.Repository{facebook, google}
-
-	readRepos, err := authorizer.FilterRepository(ctx, tom, toucan.RepositoryPermissionRead, allRepos)
-	assert.Nil(t, err)
-	assert.Equal(t, 2, len(readRepos), "there should be two repositories")
-
-	writeRepos, err := authorizer.FilterRepository(ctx, tom, toucan.RepositoryPermissionPush, allRepos)
-	assert.Nil(t, err)
-	assert.Equal(t, 1, len(writeRepos), "there should be one repository")
-}
