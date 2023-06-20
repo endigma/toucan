@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func (a Authorizer) AuthorizeGlobal(ctx context.Context, actor *models.User, action GlobalPermission) decision.Decision {
+func (a Authorizer) authorizeGlobal(ctx context.Context, actor *models.User, action GlobalPermission) decision.Decision {
 	resolver := a.resolver.Global()
 
 	if !action.Valid() {
@@ -104,7 +104,7 @@ func (a Authorizer) AuthorizeGlobal(ctx context.Context, actor *models.User, act
 	}
 }
 
-func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resource *models.Repository) decision.Decision {
+func (a Authorizer) authorizeRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resource *models.Repository) decision.Decision {
 	resolver := a.resolver.Repository()
 
 	if !action.Valid() {
@@ -268,7 +268,7 @@ func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User,
 	}
 }
 
-func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, action UserPermission, resource *models.User) decision.Decision {
+func (a Authorizer) authorizeUser(ctx context.Context, actor *models.User, action UserPermission, resource *models.User) decision.Decision {
 	resolver := a.resolver.User()
 
 	if !action.Valid() {
@@ -414,21 +414,21 @@ func (a Authorizer) Authorize(ctx context.Context, actor *models.User, permissio
 		if err != nil {
 			return decision.Error(err)
 		}
-		return a.AuthorizeGlobal(ctx, actor, perm)
+		return a.authorizeGlobal(ctx, actor, perm)
 	case "repository":
 		perm, err := ParseRepositoryPermission(permission)
 		resource, _ := resource.(*models.Repository)
 		if err != nil {
 			return decision.Error(err)
 		}
-		return a.AuthorizeRepository(ctx, actor, perm, resource)
+		return a.authorizeRepository(ctx, actor, perm, resource)
 	case "user":
 		perm, err := ParseUserPermission(permission)
 		resource, _ := resource.(*models.User)
 		if err != nil {
 			return decision.Error(err)
 		}
-		return a.AuthorizeUser(ctx, actor, perm, resource)
+		return a.authorizeUser(ctx, actor, perm, resource)
 	}
 
 	return decision.False("unmatched")

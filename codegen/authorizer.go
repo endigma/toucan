@@ -24,7 +24,7 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 		Params(
 			Id("a").Id("Authorizer"),
 		).
-		Id("Authorize" + pascal(resource.Name)).
+		Id("authorize" + pascal(resource.Name)).
 		ParamsFunc(paramsForAuthorizer(gen.Schema.Actor, resource)).Add(RuntimeDecision()).
 		BlockFunc(func(group *Group) {
 			group.Id("resolver").Op(":=").Id("a").Dot("resolver").Dot(pascal(resource.Name)).Call().Line()
@@ -200,7 +200,7 @@ func (gen *Generator) generateAuthorizerRoot(group *Group) {
 					),
 					Return(
 						Id("a").
-							Dot("Authorize"+pascal(resource.Name)).
+							Dot("authorize"+pascal(resource.Name)).
 							Call(
 								Id("ctx"), Id("actor"), Id("perm"),
 								Do(func(s *Statement) {
