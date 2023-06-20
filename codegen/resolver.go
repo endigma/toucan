@@ -21,6 +21,36 @@ func (gen *Generator) generateResolverTypes(file *File) {
 		).Qual("github.com/endigma/toucan/decision", "Decision"),
 	)
 
+	file.Line().Type().Id("ResolverFuncs").Struct(
+		Id("Role").Func().Params(
+			Id("ctx").Id("context").Dot("Context"),
+			Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
+			Id("resource").Any(), Id("role").Id("Role"),
+		).Add(RuntimeDecision()),
+		Id("Attribute").Func().Params(
+			Id("ctx").Id("context").Dot("Context"),
+			Id("resource").Any(),
+			Id("attribute").Id("Attribute"),
+		).Add(RuntimeDecision()),
+	)
+
+	file.Line().Func().Params(Id("fs").Id("ResolverFuncs")).Id("HasRole").Params(
+		Id("ctx").Id("context").Dot("Context"),
+		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
+		Id("resource").Any(),
+		Id("role").Id("Role"),
+	).Add(RuntimeDecision()).Block(
+		Return().Id("fs").Dot("Role").Call(Id("ctx"), Id("actor"), Id("resource"), Id("role")),
+	)
+
+	file.Line().Func().Params(Id("fs").Id("ResolverFuncs")).Id("HasAttribute").Params(
+		Id("ctx").Id("context").Dot("Context"),
+		Id("resource").Any(),
+		Id("attribute").Id("Attribute"),
+	).Add(RuntimeDecision()).Block(
+		Return().Id("fs").Dot("Attribute").Call(Id("ctx"), Id("resource"), Id("attribute")),
+	)
+
 	file.Line().Type().Id("resolver").Struct(
 		Id("root").Id("ResolverRoot"),
 	)

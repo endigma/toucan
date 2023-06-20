@@ -12,6 +12,19 @@ type Resolver interface {
 	HasAttribute(ctx context.Context, resource any, attribute Attribute) decision.Decision
 }
 
+type ResolverFuncs struct {
+	Role      func(ctx context.Context, actor *models.User, resource any, role Role) decision.Decision
+	Attribute func(ctx context.Context, resource any, attribute Attribute) decision.Decision
+}
+
+func (fs ResolverFuncs) HasRole(ctx context.Context, actor *models.User, resource any, role Role) decision.Decision {
+	return fs.Role(ctx, actor, resource, role)
+}
+
+func (fs ResolverFuncs) HasAttribute(ctx context.Context, resource any, attribute Attribute) decision.Decision {
+	return fs.Attribute(ctx, resource, attribute)
+}
+
 type resolver struct {
 	root ResolverRoot
 }
