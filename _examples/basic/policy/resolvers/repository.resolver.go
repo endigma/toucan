@@ -8,10 +8,6 @@ import (
 	"github.com/endigma/toucan/decision"
 )
 
-func (e repositoryResolver) CacheKey(resource *models.Repository) string {
-	return resource.ID.String()
-}
-
 func (e repositoryResolver) HasRoleOwner(context context.Context, actor *models.User, resource *models.Repository) decision.Decision {
 	for _, role := range actor.Roles {
 		if role.Repo == resource.ID && role.Role == "owner" {

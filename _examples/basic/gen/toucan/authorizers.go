@@ -4,7 +4,6 @@ package toucan
 import (
 	"context"
 	models "github.com/endigma/toucan/_examples/basic/models"
-	cache "github.com/endigma/toucan/cache"
 	decision "github.com/endigma/toucan/decision"
 	conc "github.com/sourcegraph/conc"
 	"strings"
@@ -21,8 +20,6 @@ func (af AuthorizerFunc) Authorize(ctx context.Context, actor *models.User, perm
 }
 
 func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, action GlobalPermission) decision.Decision {
-	resolver := a.resolver.Global()
-
 	if !action.Valid() {
 		return decision.Error(ErrInvalidGlobalPermission)
 	}
@@ -37,48 +34,24 @@ func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, act
 
 	switch action {
 	case GlobalPermissionReadAllProfiles:
-		// Source: attribute - ProfilesArePublic
+		// Source: attribute - profiles_are_public
 		wg.Go(func() {
-			results <- cache.Query(ctx, cache.CacheKey{
-				ActorKey:    "",
-				Resource:    "global",
-				ResourceKey: "",
-				SourceType:  "attribute",
-				SourceName:  "ProfilesArePublic",
-			}, func() decision.Decision {
-				return resolver.HasAttributeProfilesArePublic(ctx)
-			})
+			results <- a.resolver.HasAttribute(ctx, nil, "global", "profiles_are_public")
 		})
 
 	}
 	if actor != nil {
 		switch action {
 		case GlobalPermissionReadAllUsers:
-			// Source: role - Admin
+			// Source: role - admin
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "global",
-					ResourceKey: "",
-					SourceType:  "role",
-					SourceName:  "Admin",
-				}, func() decision.Decision {
-					return resolver.HasRoleAdmin(ctx, actor)
-				})
+				results <- a.resolver.HasRole(ctx, actor, nil, "global", "admin")
 			})
 
 		case GlobalPermissionWriteAllUsers:
-			// Source: role - Admin
+			// Source: role - admin
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "global",
-					ResourceKey: "",
-					SourceType:  "role",
-					SourceName:  "Admin",
-				}, func() decision.Decision {
-					return resolver.HasRoleAdmin(ctx, actor)
-				})
+				results <- a.resolver.HasRole(ctx, actor, nil, "global", "admin")
 			})
 
 		}
@@ -115,8 +88,6 @@ func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, act
 }
 
 func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resource *models.Repository) decision.Decision {
-	resolver := a.resolver.Repository()
-
 	if !action.Valid() {
 		return decision.Error(ErrInvalidRepositoryPermission)
 	}
@@ -134,115 +105,51 @@ func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User,
 
 	switch action {
 	case RepositoryPermissionRead:
-		// Source: attribute - Public
+		// Source: attribute - public
 		wg.Go(func() {
-			results <- cache.Query(ctx, cache.CacheKey{
-				ActorKey:    "",
-				Resource:    "repository",
-				ResourceKey: resolver.CacheKey(resource),
-				SourceType:  "attribute",
-				SourceName:  "Public",
-			}, func() decision.Decision {
-				return resolver.HasAttributePublic(ctx, resource)
-			})
+			results <- a.resolver.HasAttribute(ctx, resource, "repository", "public")
 		})
 
 	}
 	if actor != nil {
 		switch action {
 		case RepositoryPermissionRead:
-			// Source: role - Owner
+			// Source: role - owner
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Owner",
-				}, func() decision.Decision {
-					return resolver.HasRoleOwner(ctx, actor, resource)
-				})
+				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "owner")
 			})
 
-			// Source: role - Editor
+			// Source: role - editor
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Editor",
-				}, func() decision.Decision {
-					return resolver.HasRoleEditor(ctx, actor, resource)
-				})
+				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "editor")
 			})
 
-			// Source: role - Viewer
+			// Source: role - viewer
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Viewer",
-				}, func() decision.Decision {
-					return resolver.HasRoleViewer(ctx, actor, resource)
-				})
+				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "viewer")
 			})
 
 		case RepositoryPermissionPush:
-			// Source: role - Owner
+			// Source: role - owner
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Owner",
-				}, func() decision.Decision {
-					return resolver.HasRoleOwner(ctx, actor, resource)
-				})
+				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "owner")
 			})
 
-			// Source: role - Editor
+			// Source: role - editor
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Editor",
-				}, func() decision.Decision {
-					return resolver.HasRoleEditor(ctx, actor, resource)
-				})
+				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "editor")
 			})
 
 		case RepositoryPermissionDelete:
-			// Source: role - Owner
+			// Source: role - owner
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Owner",
-				}, func() decision.Decision {
-					return resolver.HasRoleOwner(ctx, actor, resource)
-				})
+				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "owner")
 			})
 
 		case RepositoryPermissionSnakeCase:
-			// Source: role - Owner
+			// Source: role - owner
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Owner",
-				}, func() decision.Decision {
-					return resolver.HasRoleOwner(ctx, actor, resource)
-				})
+				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "owner")
 			})
 
 		}
@@ -279,8 +186,6 @@ func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User,
 }
 
 func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, action UserPermission, resource *models.User) decision.Decision {
-	resolver := a.resolver.User()
-
 	if !action.Valid() {
 		return decision.Error(ErrInvalidUserPermission)
 	}
@@ -299,84 +204,36 @@ func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, actio
 	if actor != nil {
 		switch action {
 		case UserPermissionRead:
-			// Source: role - Admin
+			// Source: role - admin
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "user",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Admin",
-				}, func() decision.Decision {
-					return resolver.HasRoleAdmin(ctx, actor, resource)
-				})
+				results <- a.resolver.HasRole(ctx, actor, resource, "user", "admin")
 			})
 
-			// Source: role - Self
+			// Source: role - self
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "user",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Self",
-				}, func() decision.Decision {
-					return resolver.HasRoleSelf(ctx, actor, resource)
-				})
+				results <- a.resolver.HasRole(ctx, actor, resource, "user", "self")
 			})
 
-			// Source: role - Viewer
+			// Source: role - viewer
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "user",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Viewer",
-				}, func() decision.Decision {
-					return resolver.HasRoleViewer(ctx, actor, resource)
-				})
+				results <- a.resolver.HasRole(ctx, actor, resource, "user", "viewer")
 			})
 
 		case UserPermissionWrite:
-			// Source: role - Admin
+			// Source: role - admin
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "user",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Admin",
-				}, func() decision.Decision {
-					return resolver.HasRoleAdmin(ctx, actor, resource)
-				})
+				results <- a.resolver.HasRole(ctx, actor, resource, "user", "admin")
 			})
 
-			// Source: role - Self
+			// Source: role - self
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "user",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Self",
-				}, func() decision.Decision {
-					return resolver.HasRoleSelf(ctx, actor, resource)
-				})
+				results <- a.resolver.HasRole(ctx, actor, resource, "user", "self")
 			})
 
 		case UserPermissionDelete:
-			// Source: role - Admin
+			// Source: role - admin
 			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.resolver.CacheKey(actor),
-					Resource:    "user",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Admin",
-				}, func() decision.Decision {
-					return resolver.HasRoleAdmin(ctx, actor, resource)
-				})
+				results <- a.resolver.HasRole(ctx, actor, resource, "user", "admin")
 			})
 
 		}

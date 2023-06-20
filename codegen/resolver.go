@@ -5,14 +5,124 @@ import (
 	"github.com/endigma/toucan/schema"
 )
 
+//nolint:gocognit
+func (gen *Generator) generateResolverTypes(file *File) {
+	file.Line().Type().Id("Resolver").Interface(
+		Id("HasRole").Params(
+			Id("ctx").Qual("context", "Context"),
+			Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
+			Id("resource").Any(),
+			Id("resourceType").String(),
+			Id("role").String(),
+		).Qual("github.com/endigma/toucan/decision", "Decision"),
+		Id("HasAttribute").Params(
+			Id("ctx").Qual("context", "Context"),
+			Id("resource").Any(),
+			Id("resourceType").String(),
+			Id("attribute").String(),
+		).Qual("github.com/endigma/toucan/decision", "Decision"),
+	)
+
+	file.Line().Type().Id("resolver").Struct(
+		Id("root").Id("ResolverRoot"),
+	)
+
+	file.Line().Func().Params(
+		Id("r").Id("resolver"),
+	).Id("HasRole").Params(
+		Id("ctx").Qual("context", "Context"),
+		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
+		Id("resource").Any(),
+		Id("resourceType").String(),
+		Id("role").String(),
+	).Qual("github.com/endigma/toucan/decision", "Decision").Block(
+		Switch(Id("resourceType")).BlockFunc(func(group *Group) {
+			for _, resource := range gen.Schema.Resources {
+				group.Case(Lit(resource.Name)).Block(
+					Switch(Id("role")).BlockFunc(func(group *Group) {
+						for _, role := range resource.Roles {
+							group.Case(Lit(role.Name)).Block(
+								Return(Id("r").Dot("root").Dot(pascal(resource.Name)).Call().Dot("HasRole"+pascal(role.Name)).Call(
+									Id("ctx"),
+									Id("actor"),
+									Do(func(s *Statement) {
+										if resource.Model != nil {
+											s.Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
+										}
+									}),
+								)),
+							)
+						}
+						group.Default().Block(
+							Return(Qual("github.com/endigma/toucan/decision", "False").Call(
+								Lit("unmatched in HasRole: ").Op("+").Id("role")),
+							),
+						)
+					}),
+				)
+			}
+			group.Default().Block(
+				Return(Qual("github.com/endigma/toucan/decision", "False").Call(
+					Lit("unmatched in HasRole: ").Op("+").Id("resourceType")),
+				),
+			)
+		}),
+	)
+
+	file.Line().Func().Params(
+		Id("r").Id("resolver"),
+	).Id("HasAttribute").Params(
+		Id("ctx").Qual("context", "Context"),
+		Id("resource").Any(),
+		Id("resourceType").String(),
+		Id("attribute").String(),
+	).Qual("github.com/endigma/toucan/decision", "Decision").Block(
+		Switch(Id("resourceType")).BlockFunc(func(group *Group) {
+			for _, resource := range gen.Schema.Resources {
+				group.Case(Lit(resource.Name)).Block(
+					Switch(Id("attribute")).BlockFunc(func(group *Group) {
+						for _, role := range resource.Attributes {
+							group.Case(Lit(role.Name)).Block(
+								Return(Id("r").Dot("root").Dot(pascal(resource.Name)).Call().Dot("HasAttribute"+pascal(role.Name)).Call(
+									Id("ctx"),
+									Do(func(s *Statement) {
+										if resource.Model != nil {
+											s.Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
+										}
+									}),
+								)),
+							)
+						}
+						group.Default().Block(
+							Return(Qual("github.com/endigma/toucan/decision", "False").Call(
+								Lit("unmatched in HasAttribute: ").Op("+").Id("attribute")),
+							),
+						)
+					}),
+				)
+			}
+			group.Default().Block(
+				Return(Qual("github.com/endigma/toucan/decision", "False").Call(
+					Lit("unmatched in HasAttribute: ").Op("+").Id("resourceType")),
+				),
+			)
+		}),
+	)
+
+	file.Line().Func().Id("NewResolver").Params(
+		Id("root").Id("ResolverRoot"),
+	).Id("Resolver").Block(
+		Return(Id("resolver").Values(Dict{
+			Id("root"): Id("root"),
+		})),
+	)
+}
+
 func (gen *Generator) generateResourceResolver(file *File, resource schema.ResourceSchema) {
 	file.Comment("Resolver for resource `" + resource.Name + "`")
 
 	// Generate resolver interface
 	file.Type().Id(pascal(resource.Name) + "Resolver").InterfaceFunc(func(group *Group) {
-		if resource.Model != nil {
-			group.Id("CacheKey").Params(Id("resource").Op("*").Qual(resource.Model.Tuple())).Id("string").Line()
-		}
 		// Role resolver
 		if len(resource.Roles) > 0 {
 			for _, role := range resource.Roles {
@@ -42,9 +152,7 @@ func (gen *Generator) generateResourceResolver(file *File, resource schema.Resou
 
 func (gen *Generator) generateResolverRoot(group *Group) {
 	group.Comment("Root Resolver")
-	group.Type().Id("Resolver").InterfaceFunc(func(group *Group) {
-		group.Id("CacheKey").Params(Id("actor").Op("*").Qual(gen.Schema.Actor.Tuple())).Id("string").Line()
-
+	group.Type().Id("ResolverRoot").InterfaceFunc(func(group *Group) {
 		for _, resource := range gen.Schema.Resources {
 			group.Id(pascal(resource.Name)).Params().Id(pascal(resource.Name) + "Resolver")
 		}

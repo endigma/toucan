@@ -20,10 +20,10 @@ func TestAuthorization(t *testing.T) {
 		models.NewUser("Jerry", false, models.RepositoryRole{Role: "editor", Repo: google.ID}),
 		models.NewUser("Graham", false, models.RepositoryRole{Role: "viewer", Repo: facebook.ID})
 
-	resolver := resolvers.NewResolver()
+	resolver := toucan.NewResolver(resolvers.NewResolver())
 	authorizer := toucan.NewAuthorizer(resolver)
 
-	assert.True(t, resolver.Repository().HasRoleEditor(ctx, jerry, google).Allow)
+	assert.True(t, resolver.HasRole(ctx, jerry, google, "repository", "editor").Allow)
 
 	// Define test cases
 	testCases := []struct {

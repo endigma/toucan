@@ -7,6 +7,81 @@ import (
 	decision "github.com/endigma/toucan/decision"
 )
 
+type Resolver interface {
+	HasRole(ctx context.Context, actor *models.User, resource any, resourceType string, role string) decision.Decision
+	HasAttribute(ctx context.Context, resource any, resourceType string, attribute string) decision.Decision
+}
+
+type resolver struct {
+	root ResolverRoot
+}
+
+func (r resolver) HasRole(ctx context.Context, actor *models.User, resource any, resourceType string, role string) decision.Decision {
+	switch resourceType {
+	case "global":
+		switch role {
+		case "admin":
+			return r.root.Global().HasRoleAdmin(ctx, actor)
+		default:
+			return decision.False("unmatched in HasRole: " + role)
+		}
+	case "repository":
+		switch role {
+		case "owner":
+			return r.root.Repository().HasRoleOwner(ctx, actor, resource.(*models.Repository))
+		case "editor":
+			return r.root.Repository().HasRoleEditor(ctx, actor, resource.(*models.Repository))
+		case "viewer":
+			return r.root.Repository().HasRoleViewer(ctx, actor, resource.(*models.Repository))
+		default:
+			return decision.False("unmatched in HasRole: " + role)
+		}
+	case "user":
+		switch role {
+		case "admin":
+			return r.root.User().HasRoleAdmin(ctx, actor, resource.(*models.User))
+		case "self":
+			return r.root.User().HasRoleSelf(ctx, actor, resource.(*models.User))
+		case "viewer":
+			return r.root.User().HasRoleViewer(ctx, actor, resource.(*models.User))
+		default:
+			return decision.False("unmatched in HasRole: " + role)
+		}
+	default:
+		return decision.False("unmatched in HasRole: " + resourceType)
+	}
+}
+
+func (r resolver) HasAttribute(ctx context.Context, resource any, resourceType string, attribute string) decision.Decision {
+	switch resourceType {
+	case "global":
+		switch attribute {
+		case "profiles_are_public":
+			return r.root.Global().HasAttributeProfilesArePublic(ctx)
+		default:
+			return decision.False("unmatched in HasAttribute: " + attribute)
+		}
+	case "repository":
+		switch attribute {
+		case "public":
+			return r.root.Repository().HasAttributePublic(ctx, resource.(*models.Repository))
+		default:
+			return decision.False("unmatched in HasAttribute: " + attribute)
+		}
+	case "user":
+		switch attribute {
+		default:
+			return decision.False("unmatched in HasAttribute: " + attribute)
+		}
+	default:
+		return decision.False("unmatched in HasAttribute: " + resourceType)
+	}
+}
+
+func NewResolver(root ResolverRoot) Resolver {
+	return resolver{root: root}
+}
+
 // Resolver for resource `global`
 type GlobalResolver interface {
 	HasRoleAdmin(ctx context.Context, actor *models.User) decision.Decision
@@ -15,8 +90,6 @@ type GlobalResolver interface {
 
 // Resolver for resource `repository`
 type RepositoryResolver interface {
-	CacheKey(resource *models.Repository) string
-
 	HasRoleOwner(ctx context.Context, actor *models.User, resource *models.Repository) decision.Decision
 	HasRoleEditor(ctx context.Context, actor *models.User, resource *models.Repository) decision.Decision
 	HasRoleViewer(ctx context.Context, actor *models.User, resource *models.Repository) decision.Decision
@@ -25,17 +98,13 @@ type RepositoryResolver interface {
 
 // Resolver for resource `user`
 type UserResolver interface {
-	CacheKey(resource *models.User) string
-
 	HasRoleAdmin(ctx context.Context, actor *models.User, resource *models.User) decision.Decision
 	HasRoleSelf(ctx context.Context, actor *models.User, resource *models.User) decision.Decision
 	HasRoleViewer(ctx context.Context, actor *models.User, resource *models.User) decision.Decision
 }
 
 // Root Resolver
-type Resolver interface {
-	CacheKey(actor *models.User) string
-
+type ResolverRoot interface {
 	Global() GlobalResolver
 	Repository() RepositoryResolver
 	User() UserResolver

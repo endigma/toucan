@@ -13,11 +13,45 @@ var (
 	RuntimeTrue     = func() *Statement { return Qual("github.com/endigma/toucan/decision", "True") }
 	RuntimeFalse    = func() *Statement { return Qual("github.com/endigma/toucan/decision", "False") }
 	RuntimeError    = func() *Statement { return Qual("github.com/endigma/toucan/decision", "Error") }
-
-	RuntimeCache    = func() *Statement { return Qual("github.com/endigma/toucan/cache", "Cache") }
-	RuntimeCacheKey = func() *Statement { return Qual("github.com/endigma/toucan/cache", "CacheKey") }
-	RuntimeQuery    = func() *Statement { return Qual("github.com/endigma/toucan/cache", "Query") }
 )
+
+func (gen *Generator) generateAuthorizerTypes(file *File) {
+	file.Line().Type().Id("Authorizer").Interface(
+		Id("Authorize").Params(
+			Id("ctx").Qual("context", "Context"),
+			Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
+			Id("permission").String(),
+			Id("resourceType").String(),
+			Id("resource").Interface(),
+		).Qual("github.com/endigma/toucan/decision", "Decision"),
+	)
+
+	file.Line().Type().Id("AuthorizerFunc").Func().Params(
+		Id("ctx").Qual("context", "Context"),
+		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
+		Id("permission").String(),
+		Id("resourceType").String(),
+		Id("resource").Interface(),
+	).Qual("github.com/endigma/toucan/decision", "Decision")
+
+	file.Line().Func().Params(
+		Id("af").Id("AuthorizerFunc"),
+	).Id("Authorize").Params(
+		Id("ctx").Qual("context", "Context"),
+		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
+		Id("permission").String(),
+		Id("resourceType").String(),
+		Id("resource").Interface(),
+	).Qual("github.com/endigma/toucan/decision", "Decision").Block(
+		Return(Id("af").Call(
+			Id("ctx"),
+			Id("actor"),
+			Id("permission"),
+			Id("resourceType"),
+			Id("resource"),
+		)),
+	)
+}
 
 func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.ResourceSchema) {
 	file.Line().Func().
@@ -27,8 +61,6 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 		Id("authorize" + pascal(resource.Name)).
 		ParamsFunc(paramsForAuthorizer(gen.Schema.Actor, resource)).Add(RuntimeDecision()).
 		BlockFunc(func(group *Group) {
-			group.Id("resolver").Op(":=").Id("a").Dot("resolver").Dot(pascal(resource.Name)).Call().Line()
-
 			group.If(Op("!").Id("action").Dot("Valid").Call()).Block(
 				Return(
 					RuntimeError().Call(Id(fmt.Sprintf("ErrInvalid%sPermission", pascal(resource.Name)))),
@@ -56,7 +88,7 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 							continue
 						}
 
-						generateAuthorizerCase(group, resource.Name, permission, sources, resource.Model != nil)
+						generateAuthorizerCase(group, resource, permission, sources)
 					}
 				})
 			}
@@ -70,7 +102,7 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 								continue
 							}
 
-							generateAuthorizerCase(group, resource.Name, permission, sources, resource.Model != nil)
+							generateAuthorizerCase(group, resource, permission, sources)
 						}
 					}),
 				).Line()
@@ -110,61 +142,41 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 	file.Line()
 }
 
-func generateAuthorizerCase(group *Group, name string, perm string, sources []schema.PermissionSource, hasModel bool) {
-	group.Case(Id(pascal(name) + "Permission" + pascal(perm))).
+func generateAuthorizerCase(
+	group *Group,
+	resource schema.ResourceSchema,
+	perm string,
+	sources []schema.PermissionSource,
+) {
+	group.Case(Id(pascal(resource.Name) + "Permission" + pascal(perm))).
 		BlockFunc(
 			func(group *Group) {
 				for _, source := range sources {
 					group.Commentf("Source: %s - %s", source.Type, source.Name)
 					group.Id("wg").Dot("Go").Call(Func().Params().Block(
-						Id("results").Op("<-").Add(RuntimeQuery()).Call(
+						Id("results").Op("<-").Id("a").Dot("resolver").Do(func(s *Statement) {
+							switch source.Type {
+							case schema.PermissionTypeRole:
+								s.Dot("HasRole")
+							case schema.PermissionTypeAttribute:
+								s.Dot("HasAttribute")
+							}
+						}).Call(
 							Id("ctx"),
-							Add(RuntimeCacheKey()).BlockFunc(func(group *Group) {
-								group.Id("ActorKey").Op(":").Do(func(s *Statement) {
-									switch source.Type {
-									case schema.PermissionTypeRole:
-										s.Id("a").Dot("resolver").Dot("CacheKey").Call(Id("actor"))
-									case schema.PermissionTypeAttribute:
-										s.Lit("")
-									}
-								}).Op(",")
-								group.Id("Resource").Op(":").Lit(name).Op(",")
-								group.Id("ResourceKey").Op(":").Do(func(s *Statement) {
-									if hasModel {
-										s.Id("resolver").Dot("CacheKey").Call(Id("resource"))
-									} else {
-										s.Lit("")
-									}
-								}).Op(",")
-								group.Id("SourceType").Op(":").Lit(string(source.Type)).Op(",")
-								group.Id("SourceName").Op(":").Lit(source.Name).Op(",")
+							Do(func(s *Statement) {
+								if source.Type == schema.PermissionTypeRole {
+									s.Id("actor")
+								}
 							}),
-							Func().Params().Add(RuntimeDecision()).BlockFunc(func(group *Group) {
-								group.Return(
-									Id("resolver").
-										Do(func(s *Statement) {
-											switch source.Type {
-											case schema.PermissionTypeRole:
-												s.Dot("HasRole" + pascal(source.Name))
-											case schema.PermissionTypeAttribute:
-												s.Dot("HasAttribute" + pascal(source.Name))
-											}
-										}).
-										Call(
-											Id("ctx"),
-											Do(func(s *Statement) {
-												if source.Type == "role" {
-													s.Id("actor")
-												}
-											}),
-											Do(func(s *Statement) {
-												if hasModel {
-													s.Id("resource")
-												}
-											}),
-										),
-								)
+							Do(func(s *Statement) {
+								if resource.Model != nil {
+									s.Id("resource")
+								} else {
+									s.Nil()
+								}
 							}),
+							Lit(resource.Name),
+							Lit(source.Name),
 						),
 					))
 					group.Line()
