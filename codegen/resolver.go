@@ -12,14 +12,12 @@ func (gen *Generator) generateResolverTypes(file *File) {
 			Id("ctx").Qual("context", "Context"),
 			Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 			Id("resource").Any(),
-			Id("resourceType").String(),
-			Id("role").String(),
+			Id("role").Id("Role"),
 		).Qual("github.com/endigma/toucan/decision", "Decision"),
 		Id("HasAttribute").Params(
 			Id("ctx").Qual("context", "Context"),
 			Id("resource").Any(),
-			Id("resourceType").String(),
-			Id("attribute").String(),
+			Id("attribute").Id("Attribute"),
 		).Qual("github.com/endigma/toucan/decision", "Decision"),
 	)
 
@@ -33,37 +31,27 @@ func (gen *Generator) generateResolverTypes(file *File) {
 		Id("ctx").Qual("context", "Context"),
 		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 		Id("resource").Any(),
-		Id("resourceType").String(),
-		Id("role").String(),
+		Id("role").Id("Role"),
 	).Qual("github.com/endigma/toucan/decision", "Decision").Block(
-		Switch(Id("resourceType")).BlockFunc(func(group *Group) {
+		Switch(Id("role")).BlockFunc(func(group *Group) {
 			for _, resource := range gen.Schema.Resources {
-				group.Case(Lit(resource.Name)).Block(
-					Switch(Id("role")).BlockFunc(func(group *Group) {
-						for _, role := range resource.Roles {
-							group.Case(String().Call(Id(pascal(resource.Name) + "Role" + pascal(role.Name)))).Block(
-								Return(Id("r").Dot("root").Dot(pascal(resource.Name)).Call().Dot("HasRole"+pascal(role.Name)).Call(
-									Id("ctx"),
-									Id("actor"),
-									Do(func(s *Statement) {
-										if resource.Model != nil {
-											s.Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
-										}
-									}),
-								)),
-							)
-						}
-						group.Default().Block(
-							Return(Qual("github.com/endigma/toucan/decision", "False").Call(
-								Lit("unmatched in HasRole: ").Op("+").Id("role")),
-							),
-						)
-					}),
-				)
+				for _, role := range resource.Roles {
+					group.Case(Id("Role" + pascal(resource.Name) + pascal(role.Name))).Block(
+						Return(Id("r").Dot("root").Dot(pascal(resource.Name)).Call().Dot("HasRole"+pascal(role.Name)).Call(
+							Id("ctx"),
+							Id("actor"),
+							Do(func(s *Statement) {
+								if resource.Model != nil {
+									s.Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
+								}
+							}),
+						)),
+					)
+				}
 			}
 			group.Default().Block(
 				Return(Qual("github.com/endigma/toucan/decision", "False").Call(
-					Lit("unmatched in HasRole: ").Op("+").Id("resourceType")),
+					Lit("unmatched in HasRole: ").Op("+").String().Call(Id("role"))),
 				),
 			)
 		}),
@@ -74,36 +62,26 @@ func (gen *Generator) generateResolverTypes(file *File) {
 	).Id("HasAttribute").Params(
 		Id("ctx").Qual("context", "Context"),
 		Id("resource").Any(),
-		Id("resourceType").String(),
-		Id("attribute").String(),
+		Id("attribute").Id("Attribute"),
 	).Qual("github.com/endigma/toucan/decision", "Decision").Block(
-		Switch(Id("resourceType")).BlockFunc(func(group *Group) {
+		Switch(Id("attribute")).BlockFunc(func(group *Group) {
 			for _, resource := range gen.Schema.Resources {
-				group.Case(Lit(resource.Name)).Block(
-					Switch(Id("attribute")).BlockFunc(func(group *Group) {
-						for _, role := range resource.Attributes {
-							group.Case(Lit(role.Name)).Block(
-								Return(Id("r").Dot("root").Dot(pascal(resource.Name)).Call().Dot("HasAttribute"+pascal(role.Name)).Call(
-									Id("ctx"),
-									Do(func(s *Statement) {
-										if resource.Model != nil {
-											s.Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
-										}
-									}),
-								)),
-							)
-						}
-						group.Default().Block(
-							Return(Qual("github.com/endigma/toucan/decision", "False").Call(
-								Lit("unmatched in HasAttribute: ").Op("+").Id("attribute")),
-							),
-						)
-					}),
-				)
+				for _, attr := range resource.Attributes {
+					group.Case(Id("Attribute" + pascal(resource.Name) + pascal(attr.Name))).Block(
+						Return(Id("r").Dot("root").Dot(pascal(resource.Name)).Call().Dot("HasAttribute"+pascal(attr.Name)).Call(
+							Id("ctx"),
+							Do(func(s *Statement) {
+								if resource.Model != nil {
+									s.Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
+								}
+							}),
+						)),
+					)
+				}
 			}
 			group.Default().Block(
 				Return(Qual("github.com/endigma/toucan/decision", "False").Call(
-					Lit("unmatched in HasAttribute: ").Op("+").Id("resourceType")),
+					Lit("unmatched in HasAttribute: ").Op("+").String().Call(Id("attribute"))),
 				),
 			)
 		}),

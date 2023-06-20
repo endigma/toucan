@@ -12,11 +12,6 @@ func camel(s string) string {
 	return strcase.ToLowerCamel(s)
 }
 
-// String to snake_case.
-func snake(s string) string {
-	return strcase.ToSnake(s)
-}
-
 // String to PascalCase.
 func pascal(s string) string {
 	return strcase.ToCamel(s)
@@ -26,7 +21,7 @@ func paramsForAuthorizer(actor schema.Model, resource schema.ResourceSchema) fun
 	return func(group *jen.Group) {
 		group.Id("ctx").Qual("context", "Context")
 		group.Id("actor").Op("*").Qual(actor.Path, actor.Name)
-		group.Id("action").Id(pascal(resource.Name) + "Permission")
+		group.Id("action").Id("Permission")
 
 		if resource.Model != nil {
 			group.Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name)

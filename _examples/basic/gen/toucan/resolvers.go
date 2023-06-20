@@ -8,73 +8,43 @@ import (
 )
 
 type Resolver interface {
-	HasRole(ctx context.Context, actor *models.User, resource any, resourceType string, role string) decision.Decision
-	HasAttribute(ctx context.Context, resource any, resourceType string, attribute string) decision.Decision
+	HasRole(ctx context.Context, actor *models.User, resource any, role Role) decision.Decision
+	HasAttribute(ctx context.Context, resource any, attribute Attribute) decision.Decision
 }
 
 type resolver struct {
 	root ResolverRoot
 }
 
-func (r resolver) HasRole(ctx context.Context, actor *models.User, resource any, resourceType string, role string) decision.Decision {
-	switch resourceType {
-	case "global":
-		switch role {
-		case string(GlobalRoleAdmin):
-			return r.root.Global().HasRoleAdmin(ctx, actor)
-		default:
-			return decision.False("unmatched in HasRole: " + role)
-		}
-	case "repository":
-		switch role {
-		case string(RepositoryRoleOwner):
-			return r.root.Repository().HasRoleOwner(ctx, actor, resource.(*models.Repository))
-		case string(RepositoryRoleEditor):
-			return r.root.Repository().HasRoleEditor(ctx, actor, resource.(*models.Repository))
-		case string(RepositoryRoleViewer):
-			return r.root.Repository().HasRoleViewer(ctx, actor, resource.(*models.Repository))
-		default:
-			return decision.False("unmatched in HasRole: " + role)
-		}
-	case "user":
-		switch role {
-		case string(UserRoleAdmin):
-			return r.root.User().HasRoleAdmin(ctx, actor, resource.(*models.User))
-		case string(UserRoleSelf):
-			return r.root.User().HasRoleSelf(ctx, actor, resource.(*models.User))
-		case string(UserRoleViewer):
-			return r.root.User().HasRoleViewer(ctx, actor, resource.(*models.User))
-		default:
-			return decision.False("unmatched in HasRole: " + role)
-		}
+func (r resolver) HasRole(ctx context.Context, actor *models.User, resource any, role Role) decision.Decision {
+	switch role {
+	case RoleGlobalAdmin:
+		return r.root.Global().HasRoleAdmin(ctx, actor)
+	case RoleRepositoryOwner:
+		return r.root.Repository().HasRoleOwner(ctx, actor, resource.(*models.Repository))
+	case RoleRepositoryEditor:
+		return r.root.Repository().HasRoleEditor(ctx, actor, resource.(*models.Repository))
+	case RoleRepositoryViewer:
+		return r.root.Repository().HasRoleViewer(ctx, actor, resource.(*models.Repository))
+	case RoleUserAdmin:
+		return r.root.User().HasRoleAdmin(ctx, actor, resource.(*models.User))
+	case RoleUserSelf:
+		return r.root.User().HasRoleSelf(ctx, actor, resource.(*models.User))
+	case RoleUserViewer:
+		return r.root.User().HasRoleViewer(ctx, actor, resource.(*models.User))
 	default:
-		return decision.False("unmatched in HasRole: " + resourceType)
+		return decision.False("unmatched in HasRole: " + string(role))
 	}
 }
 
-func (r resolver) HasAttribute(ctx context.Context, resource any, resourceType string, attribute string) decision.Decision {
-	switch resourceType {
-	case "global":
-		switch attribute {
-		case "profiles_are_public":
-			return r.root.Global().HasAttributeProfilesArePublic(ctx)
-		default:
-			return decision.False("unmatched in HasAttribute: " + attribute)
-		}
-	case "repository":
-		switch attribute {
-		case "public":
-			return r.root.Repository().HasAttributePublic(ctx, resource.(*models.Repository))
-		default:
-			return decision.False("unmatched in HasAttribute: " + attribute)
-		}
-	case "user":
-		switch attribute {
-		default:
-			return decision.False("unmatched in HasAttribute: " + attribute)
-		}
+func (r resolver) HasAttribute(ctx context.Context, resource any, attribute Attribute) decision.Decision {
+	switch attribute {
+	case AttributeGlobalProfilesArePublic:
+		return r.root.Global().HasAttributeProfilesArePublic(ctx)
+	case AttributeRepositoryPublic:
+		return r.root.Repository().HasAttributePublic(ctx, resource.(*models.Repository))
 	default:
-		return decision.False("unmatched in HasAttribute: " + resourceType)
+		return decision.False("unmatched in HasAttribute: " + string(attribute))
 	}
 }
 

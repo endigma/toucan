@@ -6,7 +6,6 @@ go 1.20
 
 require (
 	github.com/endigma/toucan v0.0.0-20230423221446-95118f9d0dc7
-	github.com/iancoleman/strcase v0.2.0
 	github.com/rs/xid v1.4.0
 	github.com/sourcegraph/conc v0.3.0
 	github.com/spewerspew/spew v0.0.0-20220201233537-1fb8bf5ed3d2
@@ -24,6 +23,7 @@ require (
 	github.com/go-playground/validator/v10 v10.12.0 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/iancoleman/strcase v0.2.0 // indirect
 	github.com/imdario/mergo v0.3.15 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/leodido/go-urn v1.2.2 // indirect

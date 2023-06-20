@@ -1,8 +1,6 @@
 package codegen
 
 import (
-	"fmt"
-
 	. "github.com/dave/jennifer/jen"
 	"github.com/endigma/toucan/schema"
 )
@@ -20,18 +18,16 @@ func (gen *Generator) generateAuthorizerTypes(file *File) {
 		Id("Authorize").Params(
 			Id("ctx").Qual("context", "Context"),
 			Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
-			Id("permission").String(),
-			Id("resourceType").String(),
-			Id("resource").Interface(),
+			Id("permission").Id("Permission"),
+			Id("resource").Any(),
 		).Qual("github.com/endigma/toucan/decision", "Decision"),
 	)
 
 	file.Line().Type().Id("AuthorizerFunc").Func().Params(
 		Id("ctx").Qual("context", "Context"),
 		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
-		Id("permission").String(),
-		Id("resourceType").String(),
-		Id("resource").Interface(),
+		Id("permission").Id("Permission"),
+		Id("resource").Any(),
 	).Qual("github.com/endigma/toucan/decision", "Decision")
 
 	file.Line().Func().Params(
@@ -39,20 +35,19 @@ func (gen *Generator) generateAuthorizerTypes(file *File) {
 	).Id("Authorize").Params(
 		Id("ctx").Qual("context", "Context"),
 		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
-		Id("permission").String(),
-		Id("resourceType").String(),
-		Id("resource").Interface(),
+		Id("permission").Id("Permission"),
+		Id("resource").Any(),
 	).Qual("github.com/endigma/toucan/decision", "Decision").Block(
 		Return(Id("af").Call(
 			Id("ctx"),
 			Id("actor"),
 			Id("permission"),
-			Id("resourceType"),
 			Id("resource"),
 		)),
 	)
 }
 
+//nolint:gocognit
 func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.ResourceSchema) {
 	file.Line().Func().
 		Params(
@@ -61,12 +56,6 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 		Id("authorize" + pascal(resource.Name)).
 		ParamsFunc(paramsForAuthorizer(gen.Schema.Actor, resource)).Add(RuntimeDecision()).
 		BlockFunc(func(group *Group) {
-			group.If(Op("!").Id("action").Dot("Valid").Call()).Block(
-				Return(
-					RuntimeError().Call(Id(fmt.Sprintf("ErrInvalid%sPermission", pascal(resource.Name)))),
-				),
-			).Line()
-
 			if resource.Model != nil {
 				group.If(Id("resource").Op("==").Nil()).Block(
 					Return().Add(RuntimeFalse()).Call(Lit("unmatched")),
@@ -148,7 +137,7 @@ func generateAuthorizerCase(
 	perm string,
 	sources []schema.PermissionSource,
 ) {
-	group.Case(Id(pascal(resource.Name) + "Permission" + pascal(perm))).
+	group.Case(Id("Permission" + pascal(resource.Name) + pascal(perm))).
 		BlockFunc(
 			func(group *Group) {
 				for _, source := range sources {
@@ -175,8 +164,7 @@ func generateAuthorizerCase(
 									s.Nil()
 								}
 							}),
-							Lit(resource.Name),
-							Lit(source.Name),
+							Id(pascal(string(source.Type))+pascal(resource.Name)+pascal(source.Name)),
 						),
 					))
 					group.Line()
@@ -193,28 +181,33 @@ func (gen *Generator) generateAuthorizerRoot(group *Group) {
 	group.Func().Params(Id("a").Id("authorizer")).Id("Authorize").Params(
 		Id("ctx").Qual("context", "Context"),
 		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
-		Id("permission").String(),
-		Id("resourceType").String(),
+		Id("permission").Id("Permission"),
 		Id("resource").Any(),
 	).Add(RuntimeDecision()).BlockFunc(func(group *Group) {
-		group.Switch(Id("resourceType")).BlockFunc(func(group *Group) {
+		group.Switch(Id("permission")).BlockFunc(func(group *Group) {
 			for _, resource := range gen.Schema.Resources {
-				group.Case(Lit(resource.Name)).Block(
-					List(Id("perm"), Id("err")).Op(":=").Id("Parse"+pascal(resource.Name)+"Permission").Call(Id("permission")),
+				group.CaseFunc(func(group *Group) {
+					for i, permission := range resource.Permissions {
+						group.
+							Do(func(s *Statement) {
+								if i > 0 {
+									s.Line()
+								}
+							}).
+							Id("Permission" + pascal(resource.Name) + pascal(permission))
+					}
+				}).Block(
 					Do(func(s *Statement) {
 						if resource.Model != nil {
 							s.List(Id("resource"), Op("_")).Op(":=").Id("resource").
 								Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
 						}
 					}),
-					If(Id("err").Op("!=").Nil()).Block(
-						Return(RuntimeError().Call(Id("err"))),
-					),
 					Return(
 						Id("a").
 							Dot("authorize"+pascal(resource.Name)).
 							Call(
-								Id("ctx"), Id("actor"), Id("perm"),
+								Id("ctx"), Id("actor"), Id("permission"),
 								Do(func(s *Statement) {
 									if resource.Model != nil {
 										s.Id("resource")

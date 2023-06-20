@@ -10,20 +10,16 @@ import (
 )
 
 type Authorizer interface {
-	Authorize(ctx context.Context, actor *models.User, permission string, resourceType string, resource interface{}) decision.Decision
+	Authorize(ctx context.Context, actor *models.User, permission Permission, resource any) decision.Decision
 }
 
-type AuthorizerFunc func(ctx context.Context, actor *models.User, permission string, resourceType string, resource interface{}) decision.Decision
+type AuthorizerFunc func(ctx context.Context, actor *models.User, permission Permission, resource any) decision.Decision
 
-func (af AuthorizerFunc) Authorize(ctx context.Context, actor *models.User, permission string, resourceType string, resource interface{}) decision.Decision {
-	return af(ctx, actor, permission, resourceType, resource)
+func (af AuthorizerFunc) Authorize(ctx context.Context, actor *models.User, permission Permission, resource any) decision.Decision {
+	return af(ctx, actor, permission, resource)
 }
 
-func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, action GlobalPermission) decision.Decision {
-	if !action.Valid() {
-		return decision.Error(ErrInvalidGlobalPermission)
-	}
-
+func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, action Permission) decision.Decision {
 	var cancel func()
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
@@ -33,25 +29,25 @@ func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, act
 	var wg conc.WaitGroup
 
 	switch action {
-	case GlobalPermissionReadAllProfiles:
+	case PermissionGlobalReadAllProfiles:
 		// Source: attribute - profiles_are_public
 		wg.Go(func() {
-			results <- a.resolver.HasAttribute(ctx, nil, "global", "profiles_are_public")
+			results <- a.resolver.HasAttribute(ctx, nil, AttributeGlobalProfilesArePublic)
 		})
 
 	}
 	if actor != nil {
 		switch action {
-		case GlobalPermissionReadAllUsers:
+		case PermissionGlobalReadAllUsers:
 			// Source: role - admin
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, nil, "global", "admin")
+				results <- a.resolver.HasRole(ctx, actor, nil, RoleGlobalAdmin)
 			})
 
-		case GlobalPermissionWriteAllUsers:
+		case PermissionGlobalWriteAllUsers:
 			// Source: role - admin
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, nil, "global", "admin")
+				results <- a.resolver.HasRole(ctx, actor, nil, RoleGlobalAdmin)
 			})
 
 		}
@@ -87,11 +83,7 @@ func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, act
 	}
 }
 
-func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resource *models.Repository) decision.Decision {
-	if !action.Valid() {
-		return decision.Error(ErrInvalidRepositoryPermission)
-	}
-
+func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User, action Permission, resource *models.Repository) decision.Decision {
 	if resource == nil {
 		return decision.False("unmatched")
 	}
@@ -104,52 +96,52 @@ func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User,
 	var wg conc.WaitGroup
 
 	switch action {
-	case RepositoryPermissionRead:
+	case PermissionRepositoryRead:
 		// Source: attribute - public
 		wg.Go(func() {
-			results <- a.resolver.HasAttribute(ctx, resource, "repository", "public")
+			results <- a.resolver.HasAttribute(ctx, resource, AttributeRepositoryPublic)
 		})
 
 	}
 	if actor != nil {
 		switch action {
-		case RepositoryPermissionRead:
+		case PermissionRepositoryRead:
 			// Source: role - owner
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "owner")
+				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
 			})
 
 			// Source: role - editor
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "editor")
+				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryEditor)
 			})
 
 			// Source: role - viewer
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "viewer")
+				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryViewer)
 			})
 
-		case RepositoryPermissionPush:
+		case PermissionRepositoryPush:
 			// Source: role - owner
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "owner")
+				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
 			})
 
 			// Source: role - editor
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "editor")
+				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryEditor)
 			})
 
-		case RepositoryPermissionDelete:
+		case PermissionRepositoryDelete:
 			// Source: role - owner
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "owner")
+				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
 			})
 
-		case RepositoryPermissionSnakeCase:
+		case PermissionRepositorySnakeCase:
 			// Source: role - owner
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, "repository", "owner")
+				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
 			})
 
 		}
@@ -185,11 +177,7 @@ func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User,
 	}
 }
 
-func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, action UserPermission, resource *models.User) decision.Decision {
-	if !action.Valid() {
-		return decision.Error(ErrInvalidUserPermission)
-	}
-
+func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, action Permission, resource *models.User) decision.Decision {
 	if resource == nil {
 		return decision.False("unmatched")
 	}
@@ -203,37 +191,37 @@ func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, actio
 
 	if actor != nil {
 		switch action {
-		case UserPermissionRead:
+		case PermissionUserRead:
 			// Source: role - admin
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, "user", "admin")
+				results <- a.resolver.HasRole(ctx, actor, resource, RoleUserAdmin)
 			})
 
 			// Source: role - self
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, "user", "self")
+				results <- a.resolver.HasRole(ctx, actor, resource, RoleUserSelf)
 			})
 
 			// Source: role - viewer
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, "user", "viewer")
+				results <- a.resolver.HasRole(ctx, actor, resource, RoleUserViewer)
 			})
 
-		case UserPermissionWrite:
+		case PermissionUserWrite:
 			// Source: role - admin
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, "user", "admin")
+				results <- a.resolver.HasRole(ctx, actor, resource, RoleUserAdmin)
 			})
 
 			// Source: role - self
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, "user", "self")
+				results <- a.resolver.HasRole(ctx, actor, resource, RoleUserSelf)
 			})
 
-		case UserPermissionDelete:
+		case PermissionUserDelete:
 			// Source: role - admin
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, "user", "admin")
+				results <- a.resolver.HasRole(ctx, actor, resource, RoleUserAdmin)
 			})
 
 		}
@@ -274,28 +262,23 @@ type authorizer struct {
 	resolver Resolver
 }
 
-func (a authorizer) Authorize(ctx context.Context, actor *models.User, permission string, resourceType string, resource any) decision.Decision {
-	switch resourceType {
-	case "global":
-		perm, err := ParseGlobalPermission(permission)
-		if err != nil {
-			return decision.Error(err)
-		}
-		return a.authorizeGlobal(ctx, actor, perm)
-	case "repository":
-		perm, err := ParseRepositoryPermission(permission)
+func (a authorizer) Authorize(ctx context.Context, actor *models.User, permission Permission, resource any) decision.Decision {
+	switch permission {
+	case PermissionGlobalReadAllUsers,
+		PermissionGlobalWriteAllUsers,
+		PermissionGlobalReadAllProfiles:
+		return a.authorizeGlobal(ctx, actor, permission)
+	case PermissionRepositoryRead,
+		PermissionRepositoryPush,
+		PermissionRepositoryDelete,
+		PermissionRepositorySnakeCase:
 		resource, _ := resource.(*models.Repository)
-		if err != nil {
-			return decision.Error(err)
-		}
-		return a.authorizeRepository(ctx, actor, perm, resource)
-	case "user":
-		perm, err := ParseUserPermission(permission)
+		return a.authorizeRepository(ctx, actor, permission, resource)
+	case PermissionUserRead,
+		PermissionUserWrite,
+		PermissionUserDelete:
 		resource, _ := resource.(*models.User)
-		if err != nil {
-			return decision.Error(err)
-		}
-		return a.authorizeUser(ctx, actor, perm, resource)
+		return a.authorizeUser(ctx, actor, permission, resource)
 	}
 
 	return decision.False("unmatched")

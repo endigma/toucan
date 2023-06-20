@@ -4,242 +4,130 @@ package toucan
 import (
 	"errors"
 	"fmt"
-	strcase "github.com/iancoleman/strcase"
 	"strings"
 )
 
-type GlobalPermission string
+type Role string
 
 const (
-	GlobalPermissionReadAllUsers    GlobalPermission = "read_all_users"
-	GlobalPermissionWriteAllUsers   GlobalPermission = "write_all_users"
-	GlobalPermissionReadAllProfiles GlobalPermission = "read_all_profiles"
+	RoleGlobalAdmin      Role = "global.admin"
+	RoleRepositoryOwner  Role = "repository.owner"
+	RoleRepositoryEditor Role = "repository.editor"
+	RoleRepositoryViewer Role = "repository.viewer"
+	RoleUserAdmin        Role = "user.admin"
+	RoleUserSelf         Role = "user.self"
+	RoleUserViewer       Role = "user.viewer"
 )
 
 var (
-	ErrInvalidGlobalPermission = fmt.Errorf("not a valid GlobalPermission, try [%s]", strings.Join(globalPermissionNames, ", "))
-	ErrNilGlobalPermission     = errors.New("value is nil")
+	ErrInvalidRole = fmt.Errorf("not a valid Role, try [%s]", strings.Join(roleNames, ", "))
+	ErrNilRole     = errors.New("value is nil")
 )
 
 var (
-	globalPermissionMap = map[string]GlobalPermission{
-		"read_all_profiles": GlobalPermissionReadAllProfiles,
-		"read_all_users":    GlobalPermissionReadAllUsers,
-		"write_all_users":   GlobalPermissionWriteAllUsers,
+	roleMap = map[string]Role{
+		"global.admin":      RoleGlobalAdmin,
+		"repository.editor": RoleRepositoryEditor,
+		"repository.owner":  RoleRepositoryOwner,
+		"repository.viewer": RoleRepositoryViewer,
+		"user.admin":        RoleUserAdmin,
+		"user.self":         RoleUserSelf,
+		"user.viewer":       RoleUserViewer,
 	}
-	globalPermissionNames = []string{string(GlobalPermissionReadAllUsers), string(GlobalPermissionWriteAllUsers), string(GlobalPermissionReadAllProfiles)}
+	roleNames = []string{string(RoleGlobalAdmin), string(RoleRepositoryOwner), string(RoleRepositoryEditor), string(RoleRepositoryViewer), string(RoleUserAdmin), string(RoleUserSelf), string(RoleUserViewer)}
 )
 
-func (s GlobalPermission) Valid() bool {
-	_, err := ParseGlobalPermission(string(s))
+func (s Role) Valid() bool {
+	_, err := ParseRole(string(s))
 	return err == nil
 }
 
-func ParseGlobalPermission(s string) (GlobalPermission, error) {
-	if x, ok := globalPermissionMap[s]; ok {
+func ParseRole(s string) (Role, error) {
+	if x, ok := roleMap[s]; ok {
 		return x, nil
 	}
 
-	// Try to parse from snake case
-	if x, ok := globalPermissionMap[strcase.ToSnake(s)]; ok {
-		return x, nil
-	}
-
-	return "", fmt.Errorf("%s is %w", s, ErrInvalidGlobalPermission)
+	return "", fmt.Errorf("%s is %w", s, ErrInvalidRole)
 }
 
-type GlobalRole string
+type Attribute string
 
 const (
-	GlobalRoleAdmin GlobalRole = "admin"
+	AttributeGlobalProfilesArePublic Attribute = "global.profiles_are_public"
+	AttributeRepositoryPublic        Attribute = "repository.public"
 )
 
 var (
-	ErrInvalidGlobalRole = fmt.Errorf("not a valid GlobalRole, try [%s]", strings.Join(globalRoleNames, ", "))
-	ErrNilGlobalRole     = errors.New("value is nil")
+	ErrInvalidAttribute = fmt.Errorf("not a valid Attribute, try [%s]", strings.Join(attributeNames, ", "))
+	ErrNilAttribute     = errors.New("value is nil")
 )
 
 var (
-	globalRoleMap   = map[string]GlobalRole{"admin": GlobalRoleAdmin}
-	globalRoleNames = []string{string(GlobalRoleAdmin)}
+	attributeMap = map[string]Attribute{
+		"global.profiles_are_public": AttributeGlobalProfilesArePublic,
+		"repository.public":          AttributeRepositoryPublic,
+	}
+	attributeNames = []string{string(AttributeGlobalProfilesArePublic), string(AttributeRepositoryPublic)}
 )
 
-func (s GlobalRole) Valid() bool {
-	_, err := ParseGlobalRole(string(s))
+func (s Attribute) Valid() bool {
+	_, err := ParseAttribute(string(s))
 	return err == nil
 }
 
-func ParseGlobalRole(s string) (GlobalRole, error) {
-	if x, ok := globalRoleMap[s]; ok {
+func ParseAttribute(s string) (Attribute, error) {
+	if x, ok := attributeMap[s]; ok {
 		return x, nil
 	}
 
-	// Try to parse from snake case
-	if x, ok := globalRoleMap[strcase.ToSnake(s)]; ok {
-		return x, nil
-	}
-
-	return "", fmt.Errorf("%s is %w", s, ErrInvalidGlobalRole)
+	return "", fmt.Errorf("%s is %w", s, ErrInvalidAttribute)
 }
 
-type RepositoryPermission string
+type Permission string
 
 const (
-	RepositoryPermissionRead      RepositoryPermission = "read"
-	RepositoryPermissionPush      RepositoryPermission = "push"
-	RepositoryPermissionDelete    RepositoryPermission = "delete"
-	RepositoryPermissionSnakeCase RepositoryPermission = "snake_case"
+	PermissionGlobalReadAllUsers    Permission = "global.read_all_users"
+	PermissionGlobalWriteAllUsers   Permission = "global.write_all_users"
+	PermissionGlobalReadAllProfiles Permission = "global.read_all_profiles"
+	PermissionRepositoryRead        Permission = "repository.read"
+	PermissionRepositoryPush        Permission = "repository.push"
+	PermissionRepositoryDelete      Permission = "repository.delete"
+	PermissionRepositorySnakeCase   Permission = "repository.snake_case"
+	PermissionUserRead              Permission = "user.read"
+	PermissionUserWrite             Permission = "user.write"
+	PermissionUserDelete            Permission = "user.delete"
 )
 
 var (
-	ErrInvalidRepositoryPermission = fmt.Errorf("not a valid RepositoryPermission, try [%s]", strings.Join(repositoryPermissionNames, ", "))
-	ErrNilRepositoryPermission     = errors.New("value is nil")
+	ErrInvalidPermission = fmt.Errorf("not a valid Permission, try [%s]", strings.Join(permissionNames, ", "))
+	ErrNilPermission     = errors.New("value is nil")
 )
 
 var (
-	repositoryPermissionMap = map[string]RepositoryPermission{
-		"delete":     RepositoryPermissionDelete,
-		"push":       RepositoryPermissionPush,
-		"read":       RepositoryPermissionRead,
-		"snake_case": RepositoryPermissionSnakeCase,
+	permissionMap = map[string]Permission{
+		"global.read_all_profiles": PermissionGlobalReadAllProfiles,
+		"global.read_all_users":    PermissionGlobalReadAllUsers,
+		"global.write_all_users":   PermissionGlobalWriteAllUsers,
+		"repository.delete":        PermissionRepositoryDelete,
+		"repository.push":          PermissionRepositoryPush,
+		"repository.read":          PermissionRepositoryRead,
+		"repository.snake_case":    PermissionRepositorySnakeCase,
+		"user.delete":              PermissionUserDelete,
+		"user.read":                PermissionUserRead,
+		"user.write":               PermissionUserWrite,
 	}
-	repositoryPermissionNames = []string{string(RepositoryPermissionRead), string(RepositoryPermissionPush), string(RepositoryPermissionDelete), string(RepositoryPermissionSnakeCase)}
+	permissionNames = []string{string(PermissionGlobalReadAllUsers), string(PermissionGlobalWriteAllUsers), string(PermissionGlobalReadAllProfiles), string(PermissionRepositoryRead), string(PermissionRepositoryPush), string(PermissionRepositoryDelete), string(PermissionRepositorySnakeCase), string(PermissionUserRead), string(PermissionUserWrite), string(PermissionUserDelete)}
 )
 
-func (s RepositoryPermission) Valid() bool {
-	_, err := ParseRepositoryPermission(string(s))
+func (s Permission) Valid() bool {
+	_, err := ParsePermission(string(s))
 	return err == nil
 }
 
-func ParseRepositoryPermission(s string) (RepositoryPermission, error) {
-	if x, ok := repositoryPermissionMap[s]; ok {
+func ParsePermission(s string) (Permission, error) {
+	if x, ok := permissionMap[s]; ok {
 		return x, nil
 	}
 
-	// Try to parse from snake case
-	if x, ok := repositoryPermissionMap[strcase.ToSnake(s)]; ok {
-		return x, nil
-	}
-
-	return "", fmt.Errorf("%s is %w", s, ErrInvalidRepositoryPermission)
-}
-
-type RepositoryRole string
-
-const (
-	RepositoryRoleOwner  RepositoryRole = "owner"
-	RepositoryRoleEditor RepositoryRole = "editor"
-	RepositoryRoleViewer RepositoryRole = "viewer"
-)
-
-var (
-	ErrInvalidRepositoryRole = fmt.Errorf("not a valid RepositoryRole, try [%s]", strings.Join(repositoryRoleNames, ", "))
-	ErrNilRepositoryRole     = errors.New("value is nil")
-)
-
-var (
-	repositoryRoleMap = map[string]RepositoryRole{
-		"editor": RepositoryRoleEditor,
-		"owner":  RepositoryRoleOwner,
-		"viewer": RepositoryRoleViewer,
-	}
-	repositoryRoleNames = []string{string(RepositoryRoleOwner), string(RepositoryRoleEditor), string(RepositoryRoleViewer)}
-)
-
-func (s RepositoryRole) Valid() bool {
-	_, err := ParseRepositoryRole(string(s))
-	return err == nil
-}
-
-func ParseRepositoryRole(s string) (RepositoryRole, error) {
-	if x, ok := repositoryRoleMap[s]; ok {
-		return x, nil
-	}
-
-	// Try to parse from snake case
-	if x, ok := repositoryRoleMap[strcase.ToSnake(s)]; ok {
-		return x, nil
-	}
-
-	return "", fmt.Errorf("%s is %w", s, ErrInvalidRepositoryRole)
-}
-
-type UserPermission string
-
-const (
-	UserPermissionRead   UserPermission = "read"
-	UserPermissionWrite  UserPermission = "write"
-	UserPermissionDelete UserPermission = "delete"
-)
-
-var (
-	ErrInvalidUserPermission = fmt.Errorf("not a valid UserPermission, try [%s]", strings.Join(userPermissionNames, ", "))
-	ErrNilUserPermission     = errors.New("value is nil")
-)
-
-var (
-	userPermissionMap = map[string]UserPermission{
-		"delete": UserPermissionDelete,
-		"read":   UserPermissionRead,
-		"write":  UserPermissionWrite,
-	}
-	userPermissionNames = []string{string(UserPermissionRead), string(UserPermissionWrite), string(UserPermissionDelete)}
-)
-
-func (s UserPermission) Valid() bool {
-	_, err := ParseUserPermission(string(s))
-	return err == nil
-}
-
-func ParseUserPermission(s string) (UserPermission, error) {
-	if x, ok := userPermissionMap[s]; ok {
-		return x, nil
-	}
-
-	// Try to parse from snake case
-	if x, ok := userPermissionMap[strcase.ToSnake(s)]; ok {
-		return x, nil
-	}
-
-	return "", fmt.Errorf("%s is %w", s, ErrInvalidUserPermission)
-}
-
-type UserRole string
-
-const (
-	UserRoleAdmin  UserRole = "admin"
-	UserRoleSelf   UserRole = "self"
-	UserRoleViewer UserRole = "viewer"
-)
-
-var (
-	ErrInvalidUserRole = fmt.Errorf("not a valid UserRole, try [%s]", strings.Join(userRoleNames, ", "))
-	ErrNilUserRole     = errors.New("value is nil")
-)
-
-var (
-	userRoleMap = map[string]UserRole{
-		"admin":  UserRoleAdmin,
-		"self":   UserRoleSelf,
-		"viewer": UserRoleViewer,
-	}
-	userRoleNames = []string{string(UserRoleAdmin), string(UserRoleSelf), string(UserRoleViewer)}
-)
-
-func (s UserRole) Valid() bool {
-	_, err := ParseUserRole(string(s))
-	return err == nil
-}
-
-func ParseUserRole(s string) (UserRole, error) {
-	if x, ok := userRoleMap[s]; ok {
-		return x, nil
-	}
-
-	// Try to parse from snake case
-	if x, ok := userRoleMap[strcase.ToSnake(s)]; ok {
-		return x, nil
-	}
-
-	return "", fmt.Errorf("%s is %w", s, ErrInvalidUserRole)
+	return "", fmt.Errorf("%s is %w", s, ErrInvalidPermission)
 }

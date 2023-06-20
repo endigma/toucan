@@ -23,62 +23,62 @@ func TestAuthorization(t *testing.T) {
 	resolver := toucan.NewResolver(resolvers.NewResolver())
 	authorizer := toucan.NewAuthorizer(resolver)
 
-	assert.True(t, resolver.HasRole(ctx, jerry, google, "repository", string(toucan.RepositoryRoleEditor)).Allow)
+	assert.True(t, resolver.HasRole(ctx, jerry, google, toucan.RoleRepositoryEditor).Allow)
 
 	// Define test cases
 	testCases := []struct {
 		name     string
 		user     *models.User
-		action   string
+		action   toucan.Permission
 		repo     *models.Repository
 		expected bool
 	}{
 		{
 			name:     "Tom can read Facebook",
 			user:     tom,
-			action:   "read",
+			action:   toucan.PermissionRepositoryRead,
 			repo:     facebook,
 			expected: true,
 		},
 		{
 			name:     "Tom can delete Facebook",
 			user:     tom,
-			action:   "delete",
+			action:   toucan.PermissionRepositoryDelete,
 			repo:     facebook,
 			expected: true,
 		},
 		{
 			name:     "Jerry can read Google",
 			user:     jerry,
-			action:   "read",
+			action:   toucan.PermissionRepositoryRead,
 			repo:     google,
 			expected: true,
 		},
 		{
 			name:     "Graham can read Facebook",
 			user:     graham,
-			action:   "read",
+			action:   toucan.PermissionRepositoryRead,
 			repo:     facebook,
 			expected: true,
 		},
 		{
 			name:     "Jerry cannot read Facebook",
 			user:     jerry,
-			action:   "read",
+			action:   toucan.PermissionRepositoryRead,
 			repo:     facebook,
 			expected: false,
 		},
 		{
 			name:     "Graham cannot delete Facebook",
 			user:     graham,
-			action:   "delete",
+			action:   toucan.PermissionRepositoryDelete,
 			repo:     facebook,
 			expected: false,
 		},
 		{
 			name:     "Jerry cannot delete Google",
 			user:     jerry,
-			action:   "delete",
+			action:   toucan.PermissionRepositoryDelete,
 			repo:     google,
 			expected: false,
 		},
@@ -86,8 +86,8 @@ func TestAuthorization(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := authorizer.Authorize(ctx, tc.user, tc.action, "repository", tc.repo)
-			assert.Equal(t, result.Allow, tc.expected, "Reason: %s", result.Reason)
+			result := authorizer.Authorize(ctx, tc.user, tc.action, tc.repo)
+			assert.Equal(t, tc.expected, result.Allow, "Reason: %s", result.Reason)
 		})
 	}
 }

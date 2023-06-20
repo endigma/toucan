@@ -27,14 +27,13 @@ func (gen *Generator) Generate() error {
 	resolverFile := gen.NewFile()
 	authorizerFile := gen.NewFile()
 
+	gen.generateAttributeEnums(typesFile)
+	gen.generatePermissionEnum(typesFile)
 	gen.generateAuthorizerTypes(authorizerFile)
 	gen.generateResolverTypes(resolverFile)
 
 	// Generate resources
 	for _, resource := range gen.Schema.Resources {
-		// Generate types
-		gen.generateResourceTypes(typesFile, resource)
-
 		// Generate resolver
 		gen.generateResourceResolver(resolverFile, resource)
 
