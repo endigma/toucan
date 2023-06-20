@@ -37,6 +37,32 @@ func (gen *Generator) Generate() error {
 		).Qual("github.com/endigma/toucan/decision", "Decision"),
 	)
 
+	authorizerFile.Line().Type().Id("AuthorizerFunc").Func().Params(
+		Id("ctx").Qual("context", "Context"),
+		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
+		Id("permission").String(),
+		Id("resourceType").String(),
+		Id("resource").Interface(),
+	).Qual("github.com/endigma/toucan/decision", "Decision")
+
+	authorizerFile.Line().Func().Params(
+		Id("af").Id("AuthorizerFunc"),
+	).Id("Authorize").Params(
+		Id("ctx").Qual("context", "Context"),
+		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
+		Id("permission").String(),
+		Id("resourceType").String(),
+		Id("resource").Interface(),
+	).Qual("github.com/endigma/toucan/decision", "Decision").Block(
+		Return(Id("af").Call(
+			Id("ctx"),
+			Id("actor"),
+			Id("permission"),
+			Id("resourceType"),
+			Id("resource"),
+		)),
+	)
+
 	// Generate resources
 	for _, resource := range gen.Schema.Resources {
 		// Generate types

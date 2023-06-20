@@ -14,6 +14,12 @@ type Authorizer interface {
 	Authorize(ctx context.Context, actor *models.User, permission string, resourceType string, resource interface{}) decision.Decision
 }
 
+type AuthorizerFunc func(ctx context.Context, actor *models.User, permission string, resourceType string, resource interface{}) decision.Decision
+
+func (af AuthorizerFunc) Authorize(ctx context.Context, actor *models.User, permission string, resourceType string, resource interface{}) decision.Decision {
+	return af(ctx, actor, permission, resourceType, resource)
+}
+
 func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, action GlobalPermission) decision.Decision {
 	resolver := a.resolver.Global()
 
