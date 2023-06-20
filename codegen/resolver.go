@@ -41,7 +41,7 @@ func (gen *Generator) generateResolverTypes(file *File) {
 				group.Case(Lit(resource.Name)).Block(
 					Switch(Id("role")).BlockFunc(func(group *Group) {
 						for _, role := range resource.Roles {
-							group.Case(Lit(role.Name)).Block(
+							group.Case(String().Call(Id(pascal(resource.Name) + "Role" + pascal(role.Name)))).Block(
 								Return(Id("r").Dot("root").Dot(pascal(resource.Name)).Call().Dot("HasRole"+pascal(role.Name)).Call(
 									Id("ctx"),
 									Id("actor"),

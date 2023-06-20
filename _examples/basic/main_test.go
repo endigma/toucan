@@ -23,7 +23,7 @@ func TestAuthorization(t *testing.T) {
 	resolver := toucan.NewResolver(resolvers.NewResolver())
 	authorizer := toucan.NewAuthorizer(resolver)
 
-	assert.True(t, resolver.HasRole(ctx, jerry, google, "repository", "editor").Allow)
+	assert.True(t, resolver.HasRole(ctx, jerry, google, "repository", string(toucan.RepositoryRoleEditor)).Allow)
 
 	// Define test cases
 	testCases := []struct {

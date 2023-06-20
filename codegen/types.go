@@ -3,12 +3,18 @@ package codegen
 import (
 	. "github.com/dave/jennifer/jen"
 	"github.com/endigma/toucan/schema"
+	"github.com/samber/lo"
 )
 
 func (gen *Generator) generateResourceTypes(file *File, resource schema.ResourceSchema) {
-	// Generate permissions enum
 	if len(resource.Permissions) > 0 {
 		enumGen := newEnumGenerator(resource.Name+"Permission", resource.Permissions, EnumGeneratorFeatures{})
+		enumGen.Generate(file.Group)
+	}
+
+	if len(resource.Roles) > 0 {
+		roleNames := lo.Map(resource.Roles, func(schema schema.RoleSchema, _ int) string { return schema.Name })
+		enumGen := newEnumGenerator(resource.Name+"Role", roleNames, EnumGeneratorFeatures{})
 		enumGen.Generate(file.Group)
 	}
 

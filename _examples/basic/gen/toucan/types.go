@@ -48,6 +48,40 @@ func ParseGlobalPermission(s string) (GlobalPermission, error) {
 	return "", fmt.Errorf("%s is %w", s, ErrInvalidGlobalPermission)
 }
 
+type GlobalRole string
+
+const (
+	GlobalRoleAdmin GlobalRole = "admin"
+)
+
+var (
+	ErrInvalidGlobalRole = fmt.Errorf("not a valid GlobalRole, try [%s]", strings.Join(globalRoleNames, ", "))
+	ErrNilGlobalRole     = errors.New("value is nil")
+)
+
+var (
+	globalRoleMap   = map[string]GlobalRole{"admin": GlobalRoleAdmin}
+	globalRoleNames = []string{string(GlobalRoleAdmin)}
+)
+
+func (s GlobalRole) Valid() bool {
+	_, err := ParseGlobalRole(string(s))
+	return err == nil
+}
+
+func ParseGlobalRole(s string) (GlobalRole, error) {
+	if x, ok := globalRoleMap[s]; ok {
+		return x, nil
+	}
+
+	// Try to parse from snake case
+	if x, ok := globalRoleMap[strcase.ToSnake(s)]; ok {
+		return x, nil
+	}
+
+	return "", fmt.Errorf("%s is %w", s, ErrInvalidGlobalRole)
+}
+
 type RepositoryPermission string
 
 const (
@@ -90,6 +124,46 @@ func ParseRepositoryPermission(s string) (RepositoryPermission, error) {
 	return "", fmt.Errorf("%s is %w", s, ErrInvalidRepositoryPermission)
 }
 
+type RepositoryRole string
+
+const (
+	RepositoryRoleOwner  RepositoryRole = "owner"
+	RepositoryRoleEditor RepositoryRole = "editor"
+	RepositoryRoleViewer RepositoryRole = "viewer"
+)
+
+var (
+	ErrInvalidRepositoryRole = fmt.Errorf("not a valid RepositoryRole, try [%s]", strings.Join(repositoryRoleNames, ", "))
+	ErrNilRepositoryRole     = errors.New("value is nil")
+)
+
+var (
+	repositoryRoleMap = map[string]RepositoryRole{
+		"editor": RepositoryRoleEditor,
+		"owner":  RepositoryRoleOwner,
+		"viewer": RepositoryRoleViewer,
+	}
+	repositoryRoleNames = []string{string(RepositoryRoleOwner), string(RepositoryRoleEditor), string(RepositoryRoleViewer)}
+)
+
+func (s RepositoryRole) Valid() bool {
+	_, err := ParseRepositoryRole(string(s))
+	return err == nil
+}
+
+func ParseRepositoryRole(s string) (RepositoryRole, error) {
+	if x, ok := repositoryRoleMap[s]; ok {
+		return x, nil
+	}
+
+	// Try to parse from snake case
+	if x, ok := repositoryRoleMap[strcase.ToSnake(s)]; ok {
+		return x, nil
+	}
+
+	return "", fmt.Errorf("%s is %w", s, ErrInvalidRepositoryRole)
+}
+
 type UserPermission string
 
 const (
@@ -128,4 +202,44 @@ func ParseUserPermission(s string) (UserPermission, error) {
 	}
 
 	return "", fmt.Errorf("%s is %w", s, ErrInvalidUserPermission)
+}
+
+type UserRole string
+
+const (
+	UserRoleAdmin  UserRole = "admin"
+	UserRoleSelf   UserRole = "self"
+	UserRoleViewer UserRole = "viewer"
+)
+
+var (
+	ErrInvalidUserRole = fmt.Errorf("not a valid UserRole, try [%s]", strings.Join(userRoleNames, ", "))
+	ErrNilUserRole     = errors.New("value is nil")
+)
+
+var (
+	userRoleMap = map[string]UserRole{
+		"admin":  UserRoleAdmin,
+		"self":   UserRoleSelf,
+		"viewer": UserRoleViewer,
+	}
+	userRoleNames = []string{string(UserRoleAdmin), string(UserRoleSelf), string(UserRoleViewer)}
+)
+
+func (s UserRole) Valid() bool {
+	_, err := ParseUserRole(string(s))
+	return err == nil
+}
+
+func ParseUserRole(s string) (UserRole, error) {
+	if x, ok := userRoleMap[s]; ok {
+		return x, nil
+	}
+
+	// Try to parse from snake case
+	if x, ok := userRoleMap[strcase.ToSnake(s)]; ok {
+		return x, nil
+	}
+
+	return "", fmt.Errorf("%s is %w", s, ErrInvalidUserRole)
 }

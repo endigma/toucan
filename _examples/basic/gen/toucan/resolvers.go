@@ -20,29 +20,29 @@ func (r resolver) HasRole(ctx context.Context, actor *models.User, resource any,
 	switch resourceType {
 	case "global":
 		switch role {
-		case "admin":
+		case string(GlobalRoleAdmin):
 			return r.root.Global().HasRoleAdmin(ctx, actor)
 		default:
 			return decision.False("unmatched in HasRole: " + role)
 		}
 	case "repository":
 		switch role {
-		case "owner":
+		case string(RepositoryRoleOwner):
 			return r.root.Repository().HasRoleOwner(ctx, actor, resource.(*models.Repository))
-		case "editor":
+		case string(RepositoryRoleEditor):
 			return r.root.Repository().HasRoleEditor(ctx, actor, resource.(*models.Repository))
-		case "viewer":
+		case string(RepositoryRoleViewer):
 			return r.root.Repository().HasRoleViewer(ctx, actor, resource.(*models.Repository))
 		default:
 			return decision.False("unmatched in HasRole: " + role)
 		}
 	case "user":
 		switch role {
-		case "admin":
+		case string(UserRoleAdmin):
 			return r.root.User().HasRoleAdmin(ctx, actor, resource.(*models.User))
-		case "self":
+		case string(UserRoleSelf):
 			return r.root.User().HasRoleSelf(ctx, actor, resource.(*models.User))
-		case "viewer":
+		case string(UserRoleViewer):
 			return r.root.User().HasRoleViewer(ctx, actor, resource.(*models.User))
 		default:
 			return decision.False("unmatched in HasRole: " + role)
