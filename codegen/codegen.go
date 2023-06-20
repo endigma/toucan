@@ -27,6 +27,16 @@ func (gen *Generator) Generate() error {
 	resolverFile := gen.NewFile()
 	authorizerFile := gen.NewFile()
 
+	authorizerFile.Line().Type().Id("Authorizer").Interface(
+		Id("Authorize").Params(
+			Id("ctx").Qual("context", "Context"),
+			Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
+			Id("permission").String(),
+			Id("resourceType").String(),
+			Id("resource").Interface(),
+		).Qual("github.com/endigma/toucan/decision", "Decision"),
+	)
+
 	// Generate resources
 	for _, resource := range gen.Schema.Resources {
 		// Generate types

@@ -10,7 +10,11 @@ import (
 	"strings"
 )
 
-func (a Authorizer) authorizeGlobal(ctx context.Context, actor *models.User, action GlobalPermission) decision.Decision {
+type Authorizer interface {
+	Authorize(ctx context.Context, actor *models.User, permission string, resourceType string, resource interface{}) decision.Decision
+}
+
+func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, action GlobalPermission) decision.Decision {
 	resolver := a.resolver.Global()
 
 	if !action.Valid() {
@@ -104,7 +108,7 @@ func (a Authorizer) authorizeGlobal(ctx context.Context, actor *models.User, act
 	}
 }
 
-func (a Authorizer) authorizeRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resource *models.Repository) decision.Decision {
+func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resource *models.Repository) decision.Decision {
 	resolver := a.resolver.Repository()
 
 	if !action.Valid() {
@@ -268,7 +272,7 @@ func (a Authorizer) authorizeRepository(ctx context.Context, actor *models.User,
 	}
 }
 
-func (a Authorizer) authorizeUser(ctx context.Context, actor *models.User, action UserPermission, resource *models.User) decision.Decision {
+func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, action UserPermission, resource *models.User) decision.Decision {
 	resolver := a.resolver.User()
 
 	if !action.Valid() {
@@ -403,11 +407,11 @@ func (a Authorizer) authorizeUser(ctx context.Context, actor *models.User, actio
 }
 
 // Authorizer
-type Authorizer struct {
+type authorizer struct {
 	resolver Resolver
 }
 
-func (a Authorizer) Authorize(ctx context.Context, actor *models.User, permission string, resourceType string, resource any) decision.Decision {
+func (a authorizer) Authorize(ctx context.Context, actor *models.User, permission string, resourceType string, resource any) decision.Decision {
 	switch resourceType {
 	case "global":
 		perm, err := ParseGlobalPermission(permission)
@@ -434,6 +438,6 @@ func (a Authorizer) Authorize(ctx context.Context, actor *models.User, permissio
 	return decision.False("unmatched")
 }
 
-func NewAuthorizer(resolver Resolver) *Authorizer {
-	return &Authorizer{resolver: resolver}
+func NewAuthorizer(resolver Resolver) Authorizer {
+	return authorizer{resolver: resolver}
 }

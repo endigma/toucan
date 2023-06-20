@@ -20,9 +20,9 @@ var (
 )
 
 func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.ResourceSchema) {
-	file.Func().
+	file.Line().Func().
 		Params(
-			Id("a").Id("Authorizer"),
+			Id("a").Id("authorizer"),
 		).
 		Id("authorize" + pascal(resource.Name)).
 		ParamsFunc(paramsForAuthorizer(gen.Schema.Actor, resource)).Add(RuntimeDecision()).
@@ -174,11 +174,11 @@ func generateAuthorizerCase(group *Group, name string, perm string, sources []sc
 
 func (gen *Generator) generateAuthorizerRoot(group *Group) {
 	group.Comment("Authorizer")
-	group.Type().Id("Authorizer").StructFunc(func(group *Group) {
+	group.Type().Id("authorizer").StructFunc(func(group *Group) {
 		group.Id("resolver").Id("Resolver")
 	})
 
-	group.Func().Params(Id("a").Id("Authorizer")).Id("Authorize").Params(
+	group.Func().Params(Id("a").Id("authorizer")).Id("Authorize").Params(
 		Id("ctx").Qual("context", "Context"),
 		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 		Id("permission").String(),
@@ -219,8 +219,8 @@ func (gen *Generator) generateAuthorizerRoot(group *Group) {
 
 	group.Line()
 
-	group.Func().Id("NewAuthorizer").Params(Id("resolver").Id("Resolver")).Op("*").Id("Authorizer").Block(
-		Return(Op("&").Id("Authorizer").Values(Dict{
+	group.Func().Id("NewAuthorizer").Params(Id("resolver").Id("Resolver")).Id("Authorizer").Block(
+		Return(Id("authorizer").Values(Dict{
 			Id("resolver"): Id("resolver"),
 		})),
 	)
