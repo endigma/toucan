@@ -140,6 +140,29 @@ func TestSchema(t *testing.T) {
 		assert.Error(t, schema.Validate())
 	})
 
+	t.Run("duplicate attribute name and role name", func(t *testing.T) {
+		schema := schema.Schema{
+			Actor: schema.Model{"github.com/endigma/toucan/_examples/basic", "User"},
+			Resources: []schema.ResourceSchema{
+				{
+					Name:        "Post",
+					Model:       &schema.Model{"github.com/endigma/toucan/_examples/basic", "Post"},
+					Permissions: []string{"read", "write"},
+					Attributes: []schema.AttributeSchema{{
+						Name:        "Duplicate",
+						Permissions: []string{"read", "write"},
+					}},
+					Roles: []schema.RoleSchema{{
+						Name:        "Duplicate",
+						Permissions: []string{"read", "write"},
+					}},
+				},
+			},
+		}
+
+		assert.Error(t, schema.Validate())
+	})
+
 	t.Run("duplicate permission names", func(t *testing.T) {
 		schema := schema.Schema{
 			Actor: schema.Model{"github.com/endigma/toucan/_examples/basic", "User"},
