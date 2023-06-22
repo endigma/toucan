@@ -3,6 +3,7 @@ package toucan
 
 import (
 	"context"
+	"fmt"
 	models "github.com/endigma/toucan/_examples/basic/models"
 	decision "github.com/endigma/toucan/decision"
 	conc "github.com/sourcegraph/conc"
@@ -265,17 +266,26 @@ func (a authorizer) Authorize(ctx context.Context, actor *models.User, permissio
 	case PermissionGlobalReadAllUsers,
 		PermissionGlobalWriteAllUsers,
 		PermissionGlobalReadAllProfiles:
+		if resource != nil {
+			panic(fmt.Errorf("invalid resource type %T, wanted nil", resource))
+		}
 		return a.authorizeGlobal(ctx, actor, permission)
 	case PermissionRepositoryRead,
 		PermissionRepositoryPush,
 		PermissionRepositoryDelete,
 		PermissionRepositorySnakeCase:
-		resource, _ := resource.(*models.Repository)
+		resource, ok := resource.(*models.Repository)
+		if !ok {
+			panic(fmt.Errorf("invalid resource type %T for repository, wanted *github.com/endigma/toucan/_examples/basic/models.Repository", resource))
+		}
 		return a.authorizeRepository(ctx, actor, permission, resource)
 	case PermissionUserRead,
 		PermissionUserWrite,
 		PermissionUserDelete:
-		resource, _ := resource.(*models.User)
+		resource, ok := resource.(*models.User)
+		if !ok {
+			panic(fmt.Errorf("invalid resource type %T for user, wanted *github.com/endigma/toucan/_examples/basic/models.User", resource))
+		}
 		return a.authorizeUser(ctx, actor, permission, resource)
 	}
 

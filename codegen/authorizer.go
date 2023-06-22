@@ -1,6 +1,8 @@
 package codegen
 
 import (
+	"fmt"
+
 	. "github.com/dave/jennifer/jen"
 	"github.com/endigma/toucan/schema"
 )
@@ -211,8 +213,24 @@ func (gen *Generator) generateAuthorizerRoot(group *Group) {
 				}).Block(
 					Do(func(s *Statement) {
 						if resource.Model != nil {
-							s.List(Id("resource"), Op("_")).Op(":=").Id("resource").
+							s.List(Id("resource"), Op("ok")).Op(":=").Id("resource").
 								Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
+							s.Line()
+							s.If(Op("!").Id("ok")).Block(
+								Panic(
+									Qual("fmt", "Errorf").Call(
+										Lit(fmt.Sprintf(
+											"invalid resource type %%T for %s, wanted *%s.%s",
+											resource.Name, resource.Model.Path, resource.Model.Name,
+										)),
+										Id("resource"),
+									),
+								),
+							)
+						} else {
+							s.If(Id("resource").Op("!=").Nil()).Block(
+								Panic(Qual("fmt", "Errorf").Call(Lit("invalid resource type %T, wanted nil"), Id("resource"))),
+							)
 						}
 					}),
 					Return(
