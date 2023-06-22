@@ -29,13 +29,14 @@ func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, act
 	var wg conc.WaitGroup
 
 	switch action {
+
 	case PermissionGlobalReadAllProfiles:
 		// Source: attribute - profiles_are_public
 		wg.Go(func() {
 			results <- a.resolver.HasAttribute(ctx, nil, AttributeGlobalProfilesArePublic)
 		})
-
 	}
+
 	if actor != nil {
 		switch action {
 		case PermissionGlobalReadAllUsers:
@@ -49,7 +50,6 @@ func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, act
 			wg.Go(func() {
 				results <- a.resolver.HasRole(ctx, actor, nil, RoleGlobalAdmin)
 			})
-
 		}
 	}
 
@@ -101,8 +101,8 @@ func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User,
 		wg.Go(func() {
 			results <- a.resolver.HasAttribute(ctx, resource, AttributeRepositoryPublic)
 		})
-
 	}
+
 	if actor != nil {
 		switch action {
 		case PermissionRepositoryRead:
@@ -143,7 +143,6 @@ func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User,
 			wg.Go(func() {
 				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
 			})
-
 		}
 	}
 
@@ -223,7 +222,6 @@ func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, actio
 			wg.Go(func() {
 				results <- a.resolver.HasRole(ctx, actor, resource, RoleUserAdmin)
 			})
-
 		}
 	}
 

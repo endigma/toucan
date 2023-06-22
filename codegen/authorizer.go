@@ -71,10 +71,14 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 
 			if len(resource.Attributes) > 0 {
 				group.Switch(Id("action")).BlockFunc(func(group *Group) {
-					for _, permission := range resource.Permissions {
+					for i, permission := range resource.Permissions {
 						sources := resource.GetAttributeSources(permission)
 						if len(sources) == 0 {
 							continue
+						}
+
+						if i > 0 {
+							group.Line()
 						}
 
 						generateAuthorizerCase(group, resource, permission, sources)
@@ -82,13 +86,19 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 				})
 			}
 
+			group.Line()
+
 			if len(resource.Roles) > 0 {
 				group.If(Id("actor").Op("!=").Nil()).Block(
 					Switch(Id("action")).BlockFunc(func(group *Group) {
-						for _, permission := range resource.Permissions {
+						for i, permission := range resource.Permissions {
 							sources := resource.GetRoleSources(permission)
 							if len(sources) == 0 {
 								continue
+							}
+
+							if i > 0 {
+								group.Line()
 							}
 
 							generateAuthorizerCase(group, resource, permission, sources)
@@ -140,7 +150,10 @@ func generateAuthorizerCase(
 	group.Case(Id("Permission" + pascal(resource.Name) + pascal(perm))).
 		BlockFunc(
 			func(group *Group) {
-				for _, source := range sources {
+				for i, source := range sources {
+					if i > 0 {
+						group.Line()
+					}
 					group.Commentf("Source: %s - %s", source.Type, source.Name)
 					group.Id("wg").Dot("Go").Call(Func().Params().Block(
 						Id("results").Op("<-").Id("a").Dot("resolver").Do(func(s *Statement) {
@@ -167,7 +180,6 @@ func generateAuthorizerCase(
 							Id(pascal(string(source.Type))+pascal(resource.Name)+pascal(source.Name)),
 						),
 					))
-					group.Line()
 				}
 			})
 }
