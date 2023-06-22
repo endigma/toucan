@@ -2,6 +2,7 @@ package main_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/endigma/toucan/_examples/basic/gen/toucan"
@@ -23,7 +24,9 @@ func TestAuthorization(t *testing.T) {
 	resolver := toucan.NewResolver(resolvers.NewResolver())
 	authorizer := toucan.NewAuthorizer(resolver)
 
-	assert.True(t, resolver.HasRole(ctx, jerry, google, toucan.RoleRepositoryEditor).Allow)
+	isEditor, err := resolver.HasRole(ctx, jerry, google, toucan.RoleRepositoryEditor)
+	assert.NoError(t, err)
+	assert.True(t, isEditor)
 
 	// Define test cases
 	testCases := []struct {
@@ -86,8 +89,14 @@ func TestAuthorization(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := authorizer.Authorize(ctx, tc.user, tc.action, tc.repo)
-			assert.Equal(t, tc.expected, result.Allow, "Reason: %s", result.Reason)
+			err := authorizer.Authorize(ctx, tc.user, tc.action, tc.repo)
+			if tc.expected {
+				assert.True(t, errors.Is(err, toucan.Allow))
+				t.Log(err)
+			} else {
+				assert.True(t, errors.Is(err, toucan.Deny))
+				t.Log(err)
+			}
 		})
 	}
 }

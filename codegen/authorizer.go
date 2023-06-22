@@ -7,13 +7,7 @@ import (
 	"github.com/endigma/toucan/schema"
 )
 
-var (
-	ConcWaitGroup   = func() *Statement { return Qual("github.com/sourcegraph/conc", "WaitGroup") }
-	RuntimeDecision = func() *Statement { return Qual("github.com/endigma/toucan/decision", "Decision") }
-	RuntimeTrue     = func() *Statement { return Qual("github.com/endigma/toucan/decision", "True") }
-	RuntimeFalse    = func() *Statement { return Qual("github.com/endigma/toucan/decision", "False") }
-	RuntimeError    = func() *Statement { return Qual("github.com/endigma/toucan/decision", "Error") }
-)
+var ConcWaitGroup = func() *Statement { return Qual("github.com/sourcegraph/conc", "WaitGroup") }
 
 func (gen *Generator) generateAuthorizerTypes(file *File) {
 	file.Line().Type().Id("Authorizer").Interface(
@@ -22,7 +16,7 @@ func (gen *Generator) generateAuthorizerTypes(file *File) {
 			Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 			Id("permission").Id("Permission"),
 			Id("resource").Any(),
-		).Qual("github.com/endigma/toucan/decision", "Decision"),
+		).Error(),
 	)
 
 	file.Line().Type().Id("AuthorizerFunc").Func().Params(
@@ -30,7 +24,7 @@ func (gen *Generator) generateAuthorizerTypes(file *File) {
 		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 		Id("permission").Id("Permission"),
 		Id("resource").Any(),
-	).Qual("github.com/endigma/toucan/decision", "Decision")
+	).Error()
 
 	file.Line().Func().Params(
 		Id("af").Id("AuthorizerFunc"),
@@ -39,7 +33,7 @@ func (gen *Generator) generateAuthorizerTypes(file *File) {
 		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 		Id("permission").Id("Permission"),
 		Id("resource").Any(),
-	).Qual("github.com/endigma/toucan/decision", "Decision").Block(
+	).Error().Block(
 		Return(Id("af").Call(
 			Id("ctx"),
 			Id("actor"),
@@ -56,11 +50,13 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 			Id("a").Id("authorizer"),
 		).
 		Id("authorize" + pascal(resource.Name)).
-		ParamsFunc(paramsForAuthorizer(gen.Schema.Actor, resource)).Add(RuntimeDecision()).
+		ParamsFunc(paramsForAuthorizer(gen.Schema.Actor, resource)).Add(Error()).
 		BlockFunc(func(group *Group) {
 			if resource.Model != nil {
 				group.If(Id("resource").Op("==").Nil()).Block(
-					Return().Add(RuntimeFalse()).Call(Lit("unmatched")),
+					Return(Qual("fmt", "Errorf").Call(
+						Lit(fmt.Sprintf("authorize %s: resource is nil", resource.Name)),
+					)),
 				)
 			}
 
@@ -68,7 +64,12 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 			group.Id("ctx").Op(",").Id("cancel").Op("=").Qual("context", "WithCancel").Call(Id("ctx"))
 			group.Defer().Id("cancel").Call().Line()
 
-			group.Id("results").Op(":=").Make(Chan().Add(RuntimeDecision())).Line()
+			group.Id("results").Op(":=").Make(Chan().Struct(
+				Id("allow").Bool(),
+				Id("source").String(),
+				Id("error").Error(),
+			))
+
 			group.Var().Id("wg").Add(ConcWaitGroup()).Line()
 
 			if len(resource.Attributes) > 0 {
@@ -114,30 +115,41 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 				Close(Id("results")),
 			).Call().Line()
 
-			group.Var().Id("allowReason").Add(String())
-			group.Var().Id("denyReasons").Index().Add(String())
+			group.Var().Id("denyReasons").Index().String()
 
-			group.For(Id("result").Op(":=").Range().Id("results")).Block(
-				If(Id("result").Dot("Reason")).Op("==").Lit("").Block(
-					Id("result").Dot("Reason").Op("=").Lit("unspecified"),
+			group.For(List(Id("result")).Op(":=").Range().Id("results")).Block(
+				If(Qual("errors", "Is").Call(Id("result").Dot("error"), Qual("context", "Canceled"))).Block(
+					Continue(),
 				),
-				If(Id("result").Dot("Allow")).Block(
+				If(Id("result").Dot("error").Op("!=").Nil()).Block(
 					Id("cancel").Call(),
-					Id("allowReason").Op("=").Id("result").Dot("Reason"),
-				).Else().Block(
-					Id("denyReasons").Op("=").Append(Id("denyReasons"), Id("result").Dot("Reason")),
+					For(Range().Id("results")).Block(
+						Comment("drain channel"),
+					),
+					Return(Id("result").Dot("error")),
 				),
-			).Line()
-
-			group.If(Id("allowReason").Op("!=").Lit("")).Block(
-				Return(RuntimeTrue().Call(Id("allowReason"))),
-			).Else().Block(
-				Id("result").Op(":=").Add(RuntimeFalse()).Call(Qual("strings", "Join").Call(Id("denyReasons"), Lit(", "))),
-				If(Id("result").Dot("Reason")).Op("==").Lit("").Block(
-					Id("result").Dot("Reason").Op("=").Lit("unspecified"),
+				If(Id("result").Dot("allow")).Block(
+					Id("cancel").Call(),
+					For(Range().Id("results")).Block(
+						Comment("drain channel"),
+					),
+					Return(Qual("fmt", "Errorf").Call(
+						Lit(fmt.Sprintf("authorize %s: %%w: has %%s", resource.Name)),
+						Id("Allow"),
+						Id("result").Dot("source"),
+					)),
 				),
-				Return(Id("result")),
+				Id("denyReasons").Op("=").Append(
+					Id("denyReasons"),
+					Qual("fmt", "Sprintf").Call(Lit("%s"), Id("result").Dot("source")),
+				),
 			)
+
+			group.Return(Qual("fmt", "Errorf").Call(
+				Lit(fmt.Sprintf("authorize %s: %%w: missing %%s", resource.Name)),
+				Id("Deny"),
+				Qual("strings", "Join").Call(Id("denyReasons"), Lit(", ")),
+			))
 		})
 
 	file.Line()
@@ -158,7 +170,7 @@ func generateAuthorizerCase(
 					}
 					group.Commentf("Source: %s - %s", source.Type, source.Name)
 					group.Id("wg").Dot("Go").Call(Func().Params().Block(
-						Id("results").Op("<-").Id("a").Dot("resolver").Do(func(s *Statement) {
+						List(Id("allow"), Err()).Op(":=").Id("a").Dot("resolver").Do(func(s *Statement) {
 							switch source.Type {
 							case schema.PermissionTypeRole:
 								s.Dot("HasRole")
@@ -181,6 +193,15 @@ func generateAuthorizerCase(
 							}),
 							Id(pascal(string(source.Type))+pascal(resource.Name)+pascal(source.Name)),
 						),
+						Id("results").Op("<-").Struct(
+							Id("allow").Bool(),
+							Id("source").String(),
+							Id("error").Error(),
+						).Values(Dict{
+							Id("allow"):  Id("allow"),
+							Id("source"): Lit(fmt.Sprintf("%s %s", source.Name, source.Type)),
+							Id("error"):  Err(),
+						}),
 					))
 				}
 			})
@@ -197,7 +218,7 @@ func (gen *Generator) generateAuthorizerRoot(group *Group) {
 		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 		Id("permission").Id("Permission"),
 		Id("resource").Any(),
-	).Add(RuntimeDecision()).BlockFunc(func(group *Group) {
+	).Add(Error()).BlockFunc(func(group *Group) {
 		group.Switch(Id("permission")).BlockFunc(func(group *Group) {
 			for _, resource := range gen.Schema.Resources {
 				group.CaseFunc(func(group *Group) {
@@ -217,19 +238,20 @@ func (gen *Generator) generateAuthorizerRoot(group *Group) {
 								Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
 							s.Line()
 							s.If(Op("!").Id("ok")).Block(
-								Panic(
-									Qual("fmt", "Errorf").Call(
-										Lit(fmt.Sprintf(
-											"invalid resource type %%T for %s, wanted *%s.%s",
-											resource.Name, resource.Model.Path, resource.Model.Name,
-										)),
-										Id("resource"),
-									),
-								),
+								Return(Qual("fmt", "Errorf").Call(
+									Lit(fmt.Sprintf(
+										"authorize: invalid resource type %%T for %s, wanted *%s.%s",
+										resource.Name, resource.Model.Path, resource.Model.Name,
+									)),
+									Id("resource"),
+								)),
 							)
 						} else {
 							s.If(Id("resource").Op("!=").Nil()).Block(
-								Panic(Qual("fmt", "Errorf").Call(Lit("invalid resource type %T, wanted nil"), Id("resource"))),
+								Return(Qual("fmt", "Errorf").Call(
+									Lit("authorize: invalid resource type %T, wanted nil"),
+									Id("resource"),
+								)),
 							)
 						}
 					}),
@@ -249,7 +271,10 @@ func (gen *Generator) generateAuthorizerRoot(group *Group) {
 			}
 		}).Line()
 
-		group.Return(RuntimeFalse().Call(Lit("unmatched")))
+		group.Return(Qual("fmt", "Errorf").Call(
+			Lit("invalid permission %s"),
+			Id("permission"),
+		))
 	})
 
 	group.Line()

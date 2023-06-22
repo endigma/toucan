@@ -26,6 +26,7 @@ func (gen *Generator) Generate() error {
 	typesFile := gen.NewFile()
 	resolverFile := gen.NewFile()
 	authorizerFile := gen.NewFile()
+	errorsFile := gen.NewFile()
 
 	gen.generateAttributeEnums(typesFile)
 	gen.generatePermissionEnum(typesFile)
@@ -56,6 +57,13 @@ func (gen *Generator) Generate() error {
 	gen.generateAuthorizerRoot(authorizerFile.Group)
 
 	if err := authorizerFile.Save(filepath.Join(gen.Output.Path + "/authorizers.go")); err != nil {
+		return fmt.Errorf("failed to save file: %w", err)
+	}
+
+	// Generate errors
+	gen.generateErrors(errorsFile)
+
+	if err := errorsFile.Save(filepath.Join(gen.Output.Path + "/errors.go")); err != nil {
 		return fmt.Errorf("failed to save file: %w", err)
 	}
 

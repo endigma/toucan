@@ -3,30 +3,33 @@ package toucan
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	models "github.com/endigma/toucan/_examples/basic/models"
-	decision "github.com/endigma/toucan/decision"
 	conc "github.com/sourcegraph/conc"
 	"strings"
 )
 
 type Authorizer interface {
-	Authorize(ctx context.Context, actor *models.User, permission Permission, resource any) decision.Decision
+	Authorize(ctx context.Context, actor *models.User, permission Permission, resource any) error
 }
 
-type AuthorizerFunc func(ctx context.Context, actor *models.User, permission Permission, resource any) decision.Decision
+type AuthorizerFunc func(ctx context.Context, actor *models.User, permission Permission, resource any) error
 
-func (af AuthorizerFunc) Authorize(ctx context.Context, actor *models.User, permission Permission, resource any) decision.Decision {
+func (af AuthorizerFunc) Authorize(ctx context.Context, actor *models.User, permission Permission, resource any) error {
 	return af(ctx, actor, permission, resource)
 }
 
-func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, action Permission) decision.Decision {
+func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, action Permission) error {
 	var cancel func()
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
 
-	results := make(chan decision.Decision)
-
+	results := make(chan struct {
+		allow  bool
+		source string
+		error  error
+	})
 	var wg conc.WaitGroup
 
 	switch action {
@@ -34,7 +37,16 @@ func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, act
 	case PermissionGlobalReadAllProfiles:
 		// Source: attribute - profiles_are_public
 		wg.Go(func() {
-			results <- a.resolver.HasAttribute(ctx, nil, AttributeGlobalProfilesArePublic)
+			allow, err := a.resolver.HasAttribute(ctx, nil, AttributeGlobalProfilesArePublic)
+			results <- struct {
+				allow  bool
+				source string
+				error  error
+			}{
+				allow:  allow,
+				error:  err,
+				source: "profiles_are_public attribute",
+			}
 		})
 	}
 
@@ -43,13 +55,31 @@ func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, act
 		case PermissionGlobalReadAllUsers:
 			// Source: role - admin
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, nil, RoleGlobalAdmin)
+				allow, err := a.resolver.HasRole(ctx, actor, nil, RoleGlobalAdmin)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "admin role",
+				}
 			})
 
 		case PermissionGlobalWriteAllUsers:
 			// Source: role - admin
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, nil, RoleGlobalAdmin)
+				allow, err := a.resolver.HasRole(ctx, actor, nil, RoleGlobalAdmin)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "admin role",
+				}
 			})
 		}
 	}
@@ -59,48 +89,59 @@ func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, act
 		close(results)
 	}()
 
-	var allowReason string
 	var denyReasons []string
 	for result := range results {
-		if result.Reason == "" {
-			result.Reason = "unspecified"
+		if errors.Is(result.error, context.Canceled) {
+			continue
 		}
-		if result.Allow {
+		if result.error != nil {
 			cancel()
-			allowReason = result.Reason
-		} else {
-			denyReasons = append(denyReasons, result.Reason)
+			for range results {
+				// drain channel
+			}
+			return result.error
 		}
-	}
-
-	if allowReason != "" {
-		return decision.True(allowReason)
-	} else {
-		result := decision.False(strings.Join(denyReasons, ", "))
-		if result.Reason == "" {
-			result.Reason = "unspecified"
+		if result.allow {
+			cancel()
+			for range results {
+				// drain channel
+			}
+			return fmt.Errorf("authorize global: %w: has %s", Allow, result.source)
 		}
-		return result
+		denyReasons = append(denyReasons, fmt.Sprintf("%s", result.source))
 	}
+	return fmt.Errorf("authorize global: %w: missing %s", Deny, strings.Join(denyReasons, ", "))
 }
 
-func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User, action Permission, resource *models.Repository) decision.Decision {
+func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User, action Permission, resource *models.Repository) error {
 	if resource == nil {
-		return decision.False("unmatched")
+		return fmt.Errorf("authorize repository: resource is nil")
 	}
 	var cancel func()
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
 
-	results := make(chan decision.Decision)
-
+	results := make(chan struct {
+		allow  bool
+		source string
+		error  error
+	})
 	var wg conc.WaitGroup
 
 	switch action {
 	case PermissionRepositoryRead:
 		// Source: attribute - public
 		wg.Go(func() {
-			results <- a.resolver.HasAttribute(ctx, resource, AttributeRepositoryPublic)
+			allow, err := a.resolver.HasAttribute(ctx, resource, AttributeRepositoryPublic)
+			results <- struct {
+				allow  bool
+				source string
+				error  error
+			}{
+				allow:  allow,
+				error:  err,
+				source: "public attribute",
+			}
 		})
 	}
 
@@ -109,40 +150,103 @@ func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User,
 		case PermissionRepositoryRead:
 			// Source: role - owner
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
+				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "owner role",
+				}
 			})
 
 			// Source: role - editor
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryEditor)
+				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryEditor)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "editor role",
+				}
 			})
 
 			// Source: role - viewer
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryViewer)
+				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryViewer)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "viewer role",
+				}
 			})
 
 		case PermissionRepositoryPush:
 			// Source: role - owner
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
+				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "owner role",
+				}
 			})
 
 			// Source: role - editor
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryEditor)
+				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryEditor)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "editor role",
+				}
 			})
 
 		case PermissionRepositoryDelete:
 			// Source: role - owner
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
+				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "owner role",
+				}
 			})
 
 		case PermissionRepositorySnakeCase:
 			// Source: role - owner
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
+				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "owner role",
+				}
 			})
 		}
 	}
@@ -152,41 +256,43 @@ func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User,
 		close(results)
 	}()
 
-	var allowReason string
 	var denyReasons []string
 	for result := range results {
-		if result.Reason == "" {
-			result.Reason = "unspecified"
+		if errors.Is(result.error, context.Canceled) {
+			continue
 		}
-		if result.Allow {
+		if result.error != nil {
 			cancel()
-			allowReason = result.Reason
-		} else {
-			denyReasons = append(denyReasons, result.Reason)
+			for range results {
+				// drain channel
+			}
+			return result.error
 		}
-	}
-
-	if allowReason != "" {
-		return decision.True(allowReason)
-	} else {
-		result := decision.False(strings.Join(denyReasons, ", "))
-		if result.Reason == "" {
-			result.Reason = "unspecified"
+		if result.allow {
+			cancel()
+			for range results {
+				// drain channel
+			}
+			return fmt.Errorf("authorize repository: %w: has %s", Allow, result.source)
 		}
-		return result
+		denyReasons = append(denyReasons, fmt.Sprintf("%s", result.source))
 	}
+	return fmt.Errorf("authorize repository: %w: missing %s", Deny, strings.Join(denyReasons, ", "))
 }
 
-func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, action Permission, resource *models.User) decision.Decision {
+func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, action Permission, resource *models.User) error {
 	if resource == nil {
-		return decision.False("unmatched")
+		return fmt.Errorf("authorize user: resource is nil")
 	}
 	var cancel func()
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
 
-	results := make(chan decision.Decision)
-
+	results := make(chan struct {
+		allow  bool
+		source string
+		error  error
+	})
 	var wg conc.WaitGroup
 
 	if actor != nil {
@@ -194,34 +300,88 @@ func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, actio
 		case PermissionUserRead:
 			// Source: role - admin
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, RoleUserAdmin)
+				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleUserAdmin)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "admin role",
+				}
 			})
 
 			// Source: role - self
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, RoleUserSelf)
+				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleUserSelf)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "self role",
+				}
 			})
 
 			// Source: role - viewer
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, RoleUserViewer)
+				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleUserViewer)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "viewer role",
+				}
 			})
 
 		case PermissionUserWrite:
 			// Source: role - admin
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, RoleUserAdmin)
+				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleUserAdmin)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "admin role",
+				}
 			})
 
 			// Source: role - self
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, RoleUserSelf)
+				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleUserSelf)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "self role",
+				}
 			})
 
 		case PermissionUserDelete:
 			// Source: role - admin
 			wg.Go(func() {
-				results <- a.resolver.HasRole(ctx, actor, resource, RoleUserAdmin)
+				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleUserAdmin)
+				results <- struct {
+					allow  bool
+					source string
+					error  error
+				}{
+					allow:  allow,
+					error:  err,
+					source: "admin role",
+				}
 			})
 		}
 	}
@@ -231,29 +391,28 @@ func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, actio
 		close(results)
 	}()
 
-	var allowReason string
 	var denyReasons []string
 	for result := range results {
-		if result.Reason == "" {
-			result.Reason = "unspecified"
+		if errors.Is(result.error, context.Canceled) {
+			continue
 		}
-		if result.Allow {
+		if result.error != nil {
 			cancel()
-			allowReason = result.Reason
-		} else {
-			denyReasons = append(denyReasons, result.Reason)
+			for range results {
+				// drain channel
+			}
+			return result.error
 		}
-	}
-
-	if allowReason != "" {
-		return decision.True(allowReason)
-	} else {
-		result := decision.False(strings.Join(denyReasons, ", "))
-		if result.Reason == "" {
-			result.Reason = "unspecified"
+		if result.allow {
+			cancel()
+			for range results {
+				// drain channel
+			}
+			return fmt.Errorf("authorize user: %w: has %s", Allow, result.source)
 		}
-		return result
+		denyReasons = append(denyReasons, fmt.Sprintf("%s", result.source))
 	}
+	return fmt.Errorf("authorize user: %w: missing %s", Deny, strings.Join(denyReasons, ", "))
 }
 
 // Authorizer
@@ -261,13 +420,13 @@ type authorizer struct {
 	resolver Resolver
 }
 
-func (a authorizer) Authorize(ctx context.Context, actor *models.User, permission Permission, resource any) decision.Decision {
+func (a authorizer) Authorize(ctx context.Context, actor *models.User, permission Permission, resource any) error {
 	switch permission {
 	case PermissionGlobalReadAllUsers,
 		PermissionGlobalWriteAllUsers,
 		PermissionGlobalReadAllProfiles:
 		if resource != nil {
-			panic(fmt.Errorf("invalid resource type %T, wanted nil", resource))
+			return fmt.Errorf("authorize: invalid resource type %T, wanted nil", resource)
 		}
 		return a.authorizeGlobal(ctx, actor, permission)
 	case PermissionRepositoryRead,
@@ -276,7 +435,7 @@ func (a authorizer) Authorize(ctx context.Context, actor *models.User, permissio
 		PermissionRepositorySnakeCase:
 		resource, ok := resource.(*models.Repository)
 		if !ok {
-			panic(fmt.Errorf("invalid resource type %T for repository, wanted *github.com/endigma/toucan/_examples/basic/models.Repository", resource))
+			return fmt.Errorf("authorize: invalid resource type %T for repository, wanted *github.com/endigma/toucan/_examples/basic/models.Repository", resource)
 		}
 		return a.authorizeRepository(ctx, actor, permission, resource)
 	case PermissionUserRead,
@@ -284,12 +443,12 @@ func (a authorizer) Authorize(ctx context.Context, actor *models.User, permissio
 		PermissionUserDelete:
 		resource, ok := resource.(*models.User)
 		if !ok {
-			panic(fmt.Errorf("invalid resource type %T for user, wanted *github.com/endigma/toucan/_examples/basic/models.User", resource))
+			return fmt.Errorf("authorize: invalid resource type %T for user, wanted *github.com/endigma/toucan/_examples/basic/models.User", resource)
 		}
 		return a.authorizeUser(ctx, actor, permission, resource)
 	}
 
-	return decision.False("unmatched")
+	return fmt.Errorf("invalid permission %s", permission)
 }
 
 func NewAuthorizer(resolver Resolver) Authorizer {

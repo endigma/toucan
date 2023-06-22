@@ -3,25 +3,25 @@ package toucan
 
 import (
 	"context"
+	"fmt"
 	models "github.com/endigma/toucan/_examples/basic/models"
-	decision "github.com/endigma/toucan/decision"
 )
 
 type Resolver interface {
-	HasRole(ctx context.Context, actor *models.User, resource any, role Role) decision.Decision
-	HasAttribute(ctx context.Context, resource any, attribute Attribute) decision.Decision
+	HasRole(ctx context.Context, actor *models.User, resource any, role Role) (bool, error)
+	HasAttribute(ctx context.Context, resource any, attribute Attribute) (bool, error)
 }
 
 type ResolverFuncs struct {
-	Role      func(ctx context.Context, actor *models.User, resource any, role Role) decision.Decision
-	Attribute func(ctx context.Context, resource any, attribute Attribute) decision.Decision
+	Role      func(ctx context.Context, actor *models.User, resource any, role Role) (bool, error)
+	Attribute func(ctx context.Context, resource any, attribute Attribute) (bool, error)
 }
 
-func (fs ResolverFuncs) HasRole(ctx context.Context, actor *models.User, resource any, role Role) decision.Decision {
+func (fs ResolverFuncs) HasRole(ctx context.Context, actor *models.User, resource any, role Role) (bool, error) {
 	return fs.Role(ctx, actor, resource, role)
 }
 
-func (fs ResolverFuncs) HasAttribute(ctx context.Context, resource any, attribute Attribute) decision.Decision {
+func (fs ResolverFuncs) HasAttribute(ctx context.Context, resource any, attribute Attribute) (bool, error) {
 	return fs.Attribute(ctx, resource, attribute)
 }
 
@@ -29,35 +29,69 @@ type resolver struct {
 	root ResolverRoot
 }
 
-func (r resolver) HasRole(ctx context.Context, actor *models.User, resource any, role Role) decision.Decision {
+func (r resolver) HasRole(ctx context.Context, actor *models.User, resource any, role Role) (bool, error) {
 	switch role {
 	case RoleGlobalAdmin:
+		if resource != nil {
+			return false, fmt.Errorf("HasRole: invalid resource type %T, wanted nil", resource)
+		}
 		return r.root.Global().HasRoleAdmin(ctx, actor)
 	case RoleRepositoryOwner:
-		return r.root.Repository().HasRoleOwner(ctx, actor, resource.(*models.Repository))
+		repository, ok := resource.(*models.Repository)
+		if !ok {
+			return false, fmt.Errorf("HasRole: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.Repository", resource)
+		}
+		return r.root.Repository().HasRoleOwner(ctx, actor, repository)
 	case RoleRepositoryEditor:
-		return r.root.Repository().HasRoleEditor(ctx, actor, resource.(*models.Repository))
+		repository, ok := resource.(*models.Repository)
+		if !ok {
+			return false, fmt.Errorf("HasRole: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.Repository", resource)
+		}
+		return r.root.Repository().HasRoleEditor(ctx, actor, repository)
 	case RoleRepositoryViewer:
-		return r.root.Repository().HasRoleViewer(ctx, actor, resource.(*models.Repository))
+		repository, ok := resource.(*models.Repository)
+		if !ok {
+			return false, fmt.Errorf("HasRole: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.Repository", resource)
+		}
+		return r.root.Repository().HasRoleViewer(ctx, actor, repository)
 	case RoleUserAdmin:
-		return r.root.User().HasRoleAdmin(ctx, actor, resource.(*models.User))
+		user, ok := resource.(*models.User)
+		if !ok {
+			return false, fmt.Errorf("HasRole: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.User", resource)
+		}
+		return r.root.User().HasRoleAdmin(ctx, actor, user)
 	case RoleUserSelf:
-		return r.root.User().HasRoleSelf(ctx, actor, resource.(*models.User))
+		user, ok := resource.(*models.User)
+		if !ok {
+			return false, fmt.Errorf("HasRole: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.User", resource)
+		}
+		return r.root.User().HasRoleSelf(ctx, actor, user)
 	case RoleUserViewer:
-		return r.root.User().HasRoleViewer(ctx, actor, resource.(*models.User))
+		user, ok := resource.(*models.User)
+		if !ok {
+			return false, fmt.Errorf("HasRole: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.User", resource)
+		}
+		return r.root.User().HasRoleViewer(ctx, actor, user)
 	default:
-		return decision.False("unmatched in HasRole: " + string(role))
+		return false, fmt.Errorf("HasRole: unmatched: %s: %w", role, Deny)
 	}
 }
 
-func (r resolver) HasAttribute(ctx context.Context, resource any, attribute Attribute) decision.Decision {
+func (r resolver) HasAttribute(ctx context.Context, resource any, attribute Attribute) (bool, error) {
 	switch attribute {
 	case AttributeGlobalProfilesArePublic:
+		if resource != nil {
+			return false, fmt.Errorf("HasAttribute: invalid resource type %T, wanted nil", resource)
+		}
 		return r.root.Global().HasAttributeProfilesArePublic(ctx)
 	case AttributeRepositoryPublic:
-		return r.root.Repository().HasAttributePublic(ctx, resource.(*models.Repository))
+		repository, ok := resource.(*models.Repository)
+		if !ok {
+			return false, fmt.Errorf("HasAttribute: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.Repository", resource)
+		}
+		return r.root.Repository().HasAttributePublic(ctx, repository)
 	default:
-		return decision.False("unmatched in HasAttribute: " + string(attribute))
+		return false, fmt.Errorf("HasAttribute: unmatched: %s: %w", attribute, Deny)
 	}
 }
 
@@ -67,23 +101,23 @@ func NewResolver(root ResolverRoot) Resolver {
 
 // Resolver for resource `global`
 type GlobalResolver interface {
-	HasRoleAdmin(ctx context.Context, actor *models.User) decision.Decision
-	HasAttributeProfilesArePublic(ctx context.Context) decision.Decision
+	HasRoleAdmin(ctx context.Context, actor *models.User) (bool, error)
+	HasAttributeProfilesArePublic(ctx context.Context) (bool, error)
 }
 
 // Resolver for resource `repository`
 type RepositoryResolver interface {
-	HasRoleOwner(ctx context.Context, actor *models.User, resource *models.Repository) decision.Decision
-	HasRoleEditor(ctx context.Context, actor *models.User, resource *models.Repository) decision.Decision
-	HasRoleViewer(ctx context.Context, actor *models.User, resource *models.Repository) decision.Decision
-	HasAttributePublic(ctx context.Context, resource *models.Repository) decision.Decision
+	HasRoleOwner(ctx context.Context, actor *models.User, resource *models.Repository) (bool, error)
+	HasRoleEditor(ctx context.Context, actor *models.User, resource *models.Repository) (bool, error)
+	HasRoleViewer(ctx context.Context, actor *models.User, resource *models.Repository) (bool, error)
+	HasAttributePublic(ctx context.Context, resource *models.Repository) (bool, error)
 }
 
 // Resolver for resource `user`
 type UserResolver interface {
-	HasRoleAdmin(ctx context.Context, actor *models.User, resource *models.User) decision.Decision
-	HasRoleSelf(ctx context.Context, actor *models.User, resource *models.User) decision.Decision
-	HasRoleViewer(ctx context.Context, actor *models.User, resource *models.User) decision.Decision
+	HasRoleAdmin(ctx context.Context, actor *models.User, resource *models.User) (bool, error)
+	HasRoleSelf(ctx context.Context, actor *models.User, resource *models.User) (bool, error)
+	HasRoleViewer(ctx context.Context, actor *models.User, resource *models.User) (bool, error)
 }
 
 // Root Resolver

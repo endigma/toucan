@@ -1,6 +1,8 @@
 package codegen
 
 import (
+	"fmt"
+
 	. "github.com/dave/jennifer/jen"
 	"github.com/endigma/toucan/schema"
 )
@@ -13,12 +15,12 @@ func (gen *Generator) generateResolverTypes(file *File) {
 			Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 			Id("resource").Any(),
 			Id("role").Id("Role"),
-		).Qual("github.com/endigma/toucan/decision", "Decision"),
+		).Params(Bool(), Error()),
 		Id("HasAttribute").Params(
 			Id("ctx").Qual("context", "Context"),
 			Id("resource").Any(),
 			Id("attribute").Id("Attribute"),
-		).Qual("github.com/endigma/toucan/decision", "Decision"),
+		).Params(Bool(), Error()),
 	)
 
 	file.Line().Type().Id("ResolverFuncs").Struct(
@@ -26,12 +28,12 @@ func (gen *Generator) generateResolverTypes(file *File) {
 			Id("ctx").Id("context").Dot("Context"),
 			Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 			Id("resource").Any(), Id("role").Id("Role"),
-		).Add(RuntimeDecision()),
+		).Add(Params(Bool(), Error())),
 		Id("Attribute").Func().Params(
 			Id("ctx").Id("context").Dot("Context"),
 			Id("resource").Any(),
 			Id("attribute").Id("Attribute"),
-		).Add(RuntimeDecision()),
+		).Add(Params(Bool(), Error())),
 	)
 
 	file.Line().Func().Params(Id("fs").Id("ResolverFuncs")).Id("HasRole").Params(
@@ -39,7 +41,7 @@ func (gen *Generator) generateResolverTypes(file *File) {
 		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 		Id("resource").Any(),
 		Id("role").Id("Role"),
-	).Add(RuntimeDecision()).Block(
+	).Add(Params(Bool(), Error())).Block(
 		Return().Id("fs").Dot("Role").Call(Id("ctx"), Id("actor"), Id("resource"), Id("role")),
 	)
 
@@ -47,7 +49,7 @@ func (gen *Generator) generateResolverTypes(file *File) {
 		Id("ctx").Id("context").Dot("Context"),
 		Id("resource").Any(),
 		Id("attribute").Id("Attribute"),
-	).Add(RuntimeDecision()).Block(
+	).Add(Params(Bool(), Error())).Block(
 		Return().Id("fs").Dot("Attribute").Call(Id("ctx"), Id("resource"), Id("attribute")),
 	)
 
@@ -62,17 +64,43 @@ func (gen *Generator) generateResolverTypes(file *File) {
 		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 		Id("resource").Any(),
 		Id("role").Id("Role"),
-	).Qual("github.com/endigma/toucan/decision", "Decision").Block(
+	).Params(Bool(), Error()).Block(
 		Switch(Id("role")).BlockFunc(func(group *Group) {
 			for _, resource := range gen.Schema.Resources {
 				for _, role := range resource.Roles {
-					group.Case(Id("Role" + pascal(resource.Name) + pascal(role.Name))).Block(
+					group.Case(Id("Role"+pascal(resource.Name)+pascal(role.Name))).Block(
+						Do(func(s *Statement) {
+							if resource.Model != nil {
+								s.List(
+									Id(resource.Name),
+									Id("ok"),
+								).Op(":=").Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
+								s.Line()
+								s.If(Op("!").Id("ok")).Block(
+									Return(List(False(), Qual("fmt", "Errorf").Call(
+										Lit(
+											fmt.Sprintf(
+												"HasRole: invalid resource type %%T, wanted *%s.%s",
+												resource.Model.Path,
+												resource.Model.Name,
+											),
+										), Id("resource"),
+									))),
+								)
+							} else {
+								s.If(Id("resource").Op("!=").Nil()).Block(
+									Return(List(False(), Qual("fmt", "Errorf").Call(
+										Lit("HasRole: invalid resource type %T, wanted nil"), Id("resource"),
+									))),
+								)
+							}
+						}),
 						Return(Id("r").Dot("root").Dot(pascal(resource.Name)).Call().Dot("HasRole"+pascal(role.Name)).Call(
 							Id("ctx"),
 							Id("actor"),
 							Do(func(s *Statement) {
 								if resource.Model != nil {
-									s.Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
+									s.Id(resource.Name)
 								}
 							}),
 						)),
@@ -80,9 +108,9 @@ func (gen *Generator) generateResolverTypes(file *File) {
 				}
 			}
 			group.Default().Block(
-				Return(Qual("github.com/endigma/toucan/decision", "False").Call(
-					Lit("unmatched in HasRole: ").Op("+").String().Call(Id("role"))),
-				),
+				Return(List(False(), Qual("fmt", "Errorf").Call(
+					Lit("HasRole: unmatched: %s: %w"), Id("role"), Id("Deny"),
+				))),
 			)
 		}),
 	)
@@ -93,16 +121,42 @@ func (gen *Generator) generateResolverTypes(file *File) {
 		Id("ctx").Qual("context", "Context"),
 		Id("resource").Any(),
 		Id("attribute").Id("Attribute"),
-	).Qual("github.com/endigma/toucan/decision", "Decision").Block(
+	).Params(Bool(), Error()).Block(
 		Switch(Id("attribute")).BlockFunc(func(group *Group) {
 			for _, resource := range gen.Schema.Resources {
 				for _, attr := range resource.Attributes {
-					group.Case(Id("Attribute" + pascal(resource.Name) + pascal(attr.Name))).Block(
+					group.Case(Id("Attribute"+pascal(resource.Name)+pascal(attr.Name))).Block(
+						Do(func(s *Statement) {
+							if resource.Model != nil {
+								s.List(
+									Id(resource.Name),
+									Id("ok"),
+								).Op(":=").Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
+								s.Line()
+								s.If(Op("!").Id("ok")).Block(
+									Return(List(False(), Qual("fmt", "Errorf").Call(
+										Lit(
+											fmt.Sprintf(
+												"HasAttribute: invalid resource type %%T, wanted *%s.%s",
+												resource.Model.Path,
+												resource.Model.Name,
+											),
+										), Id("resource"),
+									))),
+								)
+							} else {
+								s.If(Id("resource").Op("!=").Nil()).Block(
+									Return(List(False(), Qual("fmt", "Errorf").Call(
+										Lit("HasAttribute: invalid resource type %T, wanted nil"), Id("resource"),
+									))),
+								)
+							}
+						}),
 						Return(Id("r").Dot("root").Dot(pascal(resource.Name)).Call().Dot("HasAttribute"+pascal(attr.Name)).Call(
 							Id("ctx"),
 							Do(func(s *Statement) {
 								if resource.Model != nil {
-									s.Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
+									s.Id(resource.Name)
 								}
 							}),
 						)),
@@ -110,8 +164,8 @@ func (gen *Generator) generateResolverTypes(file *File) {
 				}
 			}
 			group.Default().Block(
-				Return(Qual("github.com/endigma/toucan/decision", "False").Call(
-					Lit("unmatched in HasAttribute: ").Op("+").String().Call(Id("attribute"))),
+				Return(False(), Qual("fmt", "Errorf").Call(
+					Lit("HasAttribute: unmatched: %s: %w"), Id("attribute"), Id("Deny")),
 				),
 			)
 		}),
@@ -140,7 +194,7 @@ func (gen *Generator) generateResourceResolver(file *File, resource schema.Resou
 					if resource.Model != nil {
 						group.Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name)
 					}
-				}).Add(RuntimeDecision())
+				}).Add(Params(Bool(), Error()))
 			}
 		}
 
@@ -152,7 +206,7 @@ func (gen *Generator) generateResourceResolver(file *File, resource schema.Resou
 					if resource.Model != nil {
 						group.Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name)
 					}
-				}).Add(RuntimeDecision())
+				}).Add(Params(Bool(), Error()))
 			}
 		}
 	})
