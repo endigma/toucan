@@ -2,7 +2,7 @@ package codegen
 
 import (
 	. "github.com/dave/jennifer/jen"
-	"github.com/endigma/toucan/schema"
+	"github.com/samber/lo"
 )
 
 var ConcWaitGroup = func() *Statement { return Qual("github.com/sourcegraph/conc", "WaitGroup") }
@@ -46,140 +46,33 @@ func (gen *Generator) generateAuthorizerTypes(file *File) {
 		Id("error").Error(),
 	)
 
-	file.Line().Func().Params(
-		Id("a").Id("authorizer"),
-	).Id("checkAttributes").Params(
-		Id("ctx").Qual("context", "Context"),
-		Id("wg").Op("*").Qual("github.com/sourcegraph/conc", "WaitGroup"),
-		Id("results").Chan().Op("<-").Id("authorizerResult"),
-		Id("resource").Any(),
-		Id("attributes").Index().Id("Attribute"),
-	).Block(
-		For(List(Id("_"), Id("attribute")).Op(":=").Range().Id("attributes")).Block(
-			Id("attribute").Op(":=").Id("attribute"),
-			Id("wg").Dot("Go").Call(Func().Params().Block(
-				List(Id("allow"), Id("err")).Op(":=").Id("a").Dot("resolver").Dot("HasAttribute").Call(
-					Id("ctx"),
-					Id("resource"),
-					Id("attribute"),
-				),
-				Id("results").Op("<-").Id("authorizerResult").Values(Dict{
-					Id("allow"):  Id("allow"),
-					Id("source"): Qual("fmt", "Sprintf").Call(Lit("attribute %s"), Id("attribute")),
-					Id("error"):  Err(),
-				}),
-			)),
-		),
-	)
-
-	file.Line().Func().Params(
-		Id("a").Id("authorizer"),
-	).Id("checkRoles").Params(
-		Id("ctx").Qual("context", "Context"),
-		Id("wg").Op("*").Qual("github.com/sourcegraph/conc", "WaitGroup"),
-		Id("results").Chan().Op("<-").Id("authorizerResult"),
-		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
-		Id("resource").Any(),
-		Id("roles").Index().Id("Role"),
-	).Block(
-		For(List(Id("_"), Id("role")).Op(":=").Range().Id("roles")).Block(
-			Id("role").Op(":=").Id("role"),
-			Id("wg").Dot("Go").Call(Func().Params().Block(
-				List(Id("allow"), Id("err")).Op(":=").Id("a").Dot("resolver").Dot("HasRole").Call(
-					Id("ctx"),
-					Id("actor"),
-					Id("resource"),
-					Id("role"),
-				),
-				Id("results").Op("<-").Id("authorizerResult").Values(Dict{
-					Id("allow"):  Id("allow"),
-					Id("source"): Qual("fmt", "Sprintf").Call(Lit("role %s"), Id("role")),
-					Id("error"):  Err(),
-				}),
-			)),
-		),
-	)
-}
-
-func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.ResourceSchema) {
-	file.Line().Func().
-		Params(
-			Id("a").Id("authorizer"),
-		).
-		Id("check"+pascal(resource.Name)).
-		Params(
-			Id("ctx").Qual("context", "Context"),
-			Id("wg").Op("*").Qual("github.com/sourcegraph/conc", "WaitGroup"),
-			Id("results").Chan().Op("<-").Id("authorizerResult"),
-			Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
-			Id("action").Id("Permission"),
-			Id("resource").Id("any"),
-		).
-		BlockFunc(func(group *Group) {
-			if len(resource.Attributes) > 0 {
-				group.Switch(Id("action")).BlockFunc(func(group *Group) {
-					for _, permission := range resource.Permissions {
-						sources := resource.GetAttributeSources(permission)
-						if len(sources) == 0 {
-							continue
-						}
-
-						generateAuthorizerCase(group, resource, permission, schema.PermissionTypeAttribute, sources)
-					}
-				})
-			}
-
-			if len(resource.Roles) > 0 {
-				group.If(Id("actor").Op("!=").Nil()).Block(
-					Switch(Id("action")).BlockFunc(func(group *Group) {
-						for _, permission := range resource.Permissions {
-							sources := resource.GetRoleSources(permission)
-							if len(sources) == 0 {
-								continue
+	file.Line().Var().Id("authorizerData").Op("=").Map(Id("Permission")).Struct(
+		Id("Attributes").Index().Id("Attribute"),
+		Id("Roles").Index().Id("Role"),
+	).Values(DictFunc(
+		func(d Dict) {
+			for _, resource := range gen.Schema.Resources {
+				for _, permission := range resource.Permissions {
+					d[Id("Permission"+pascal(resource.Name)+pascal(permission))] = Values(Dict{
+						Id("Attributes"): Index().Id("Attribute").ValuesFunc(func(group *Group) {
+							for _, attribute := range resource.Attributes {
+								if lo.Contains(attribute.Permissions, permission) {
+									group.Id("Attribute" + pascal(resource.Name) + pascal(attribute.Name))
+								}
 							}
-
-							generateAuthorizerCase(group, resource, permission, schema.PermissionTypeRole, sources)
-						}
-					}),
-				)
-			}
-		})
-
-	file.Line()
-}
-
-func generateAuthorizerCase(
-	group *Group,
-	resource schema.ResourceSchema,
-	perm string,
-	sourceType schema.PermissionType,
-	sources []schema.PermissionSource,
-) {
-	group.Case(Id("Permission" + pascal(resource.Name) + pascal(perm))).Block(
-		Id("a").Do(func(s *Statement) {
-			switch sourceType {
-			case schema.PermissionTypeAttribute:
-				s.Dot("checkAttributes")
-			case schema.PermissionTypeRole:
-				s.Dot("checkRoles")
-			}
-		}).Call(
-			Id("ctx"),
-			Id("wg"),
-			Id("results"),
-			Do(func(s *Statement) {
-				if sourceType == schema.PermissionTypeRole {
-					s.Id("actor")
+						}),
+						Id("Roles"): Index().Id("Role").ValuesFunc(func(group *Group) {
+							for _, role := range resource.Roles {
+								if lo.Contains(role.Permissions, permission) {
+									group.Id("Role" + pascal(resource.Name) + pascal(role.Name))
+								}
+							}
+						}),
+					})
 				}
-			}),
-			Id("resource"),
-			Index().Id(pascal(string(sourceType))).BlockFunc(func(g *Group) {
-				for _, source := range sources {
-					g.Id(pascal(string(sourceType)) + pascal(resource.Name) + pascal(source.Name)).Op(",")
-				}
-			}),
-		),
-	)
+			}
+		},
+	))
 }
 
 func (gen *Generator) generateAuthorizerRoot(group *Group) {
@@ -196,38 +89,55 @@ func (gen *Generator) generateAuthorizerRoot(group *Group) {
 	).Add(Error()).Block(
 		Var().Id("cancel").Func().Params(),
 		Id("ctx").Op(",").Id("cancel").Op("=").Qual("context", "WithCancel").Call(Id("ctx")),
-		Defer().Id("cancel").Call().Line(),
+		Defer().Id("cancel").Call(),
+		Line(),
 		Id("results").Op(":=").Make(Chan().Id("authorizerResult")),
-		Var().Id("wg").Add(ConcWaitGroup()).Line(),
-		Switch(Id("permission")).BlockFunc(func(group *Group) {
-			for _, resource := range gen.Schema.Resources {
-				group.CaseFunc(func(group *Group) {
-					for i, permission := range resource.Permissions {
-						group.
-							Do(func(s *Statement) {
-								if i > 0 {
-									s.Line()
-								}
-							}).
-							Id("Permission" + pascal(resource.Name) + pascal(permission))
-					}
-				}).Block(
-					Id("a").Dot("check"+pascal(resource.Name)).Call(
-						Id("ctx"), Op("&").Id("wg"), Id("results"), Id("actor"), Id("permission"), Id("resource"),
+		Var().Id("wg").Add(ConcWaitGroup()),
+		Line(),
+		List(Op("authorizerData"), Id("ok")).Op(":=").Id("authorizerData").Index(Id("permission")),
+		If(Op("!").Id("ok")).Block(
+			Return(Qual("fmt", "Errorf").Call(Lit("invalid permission %s"), Id("permission"))),
+		),
+		Line(),
+		For(List(Id("_"), Id("attribute")).Op(":=").Range().Id("authorizerData").Dot("Attributes")).Block(
+			Id("attribute").Op(":=").Id("attribute"),
+			Id("wg").Dot("Go").Call(Func().Params().Block(
+				List(Id("allow"), Id("err")).Op(":=").Id("a").Dot("resolver").Dot("HasAttribute").Call(
+					Id("ctx"),
+					Id("resource"),
+					Id("attribute"),
+				),
+				Id("results").Op("<-").Id("authorizerResult").Values(Dict{
+					Id("allow"):  Id("allow"),
+					Id("source"): Qual("fmt", "Sprintf").Call(Lit("attribute %s"), Id("attribute")),
+					Id("error"):  Err(),
+				}),
+			)),
+		),
+		If(Id("actor").Op("!=").Nil()).Block(
+			For(List(Id("_"), Id("role")).Op(":=").Range().Id("authorizerData").Dot("Roles")).Block(
+				Id("role").Op(":=").Id("role"),
+				Id("wg").Dot("Go").Call(Func().Params().Block(
+					List(Id("allow"), Id("err")).Op(":=").Id("a").Dot("resolver").Dot("HasRole").Call(
+						Id("ctx"),
+						Id("actor"),
+						Id("resource"),
+						Id("role"),
 					),
-				)
-			}
-			group.Default().Block(
-				Return(Qual("fmt", "Errorf").Call(
-					Lit("invalid permission %s"),
-					Id("permission"),
+					Id("results").Op("<-").Id("authorizerResult").Values(Dict{
+						Id("allow"):  Id("allow"),
+						Id("source"): Qual("fmt", "Sprintf").Call(Lit("role %s"), Id("role")),
+						Id("error"):  Err(),
+					}),
 				)),
-			)
-		}).Line(),
+			),
+		),
+		Line(),
 		Go().Func().Params().Block(
 			Id("wg").Dot("Wait").Call(),
 			Close(Id("results")),
-		).Call().Line(),
+		).Call(),
+		Line(),
 		Var().Id("denyReasons").Index().String(),
 		For(List(Id("result")).Op(":=").Range().Id("results")).Block(
 			If(Qual("errors", "Is").Call(Id("result").Dot("error"), Qual("context", "Canceled"))).Block(

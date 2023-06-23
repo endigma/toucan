@@ -37,9 +37,6 @@ func (gen *Generator) Generate() error {
 	for _, resource := range gen.Schema.Resources {
 		// Generate resolver
 		gen.generateResourceResolver(resolverFile, resource)
-
-		// Generate authorizer
-		gen.generateResourceAuthorizer(authorizerFile, resource)
 	}
 
 	if err := typesFile.Save(filepath.Join(gen.Output.Path + "/types.go")); err != nil {

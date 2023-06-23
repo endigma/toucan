@@ -121,42 +121,42 @@ func (gen *Generator) generateResolverTypes(file *File) {
 		Switch(Id("attribute")).BlockFunc(func(group *Group) {
 			for _, resource := range gen.Schema.Resources {
 				for _, attr := range resource.Attributes {
-					group.Case(Id("Attribute"+pascal(resource.Name)+pascal(attr.Name))).Block(
-						Do(func(s *Statement) {
-							if resource.Model != nil {
-								s.List(
-									Id(resource.Name),
-									Id("ok"),
-								).Op(":=").Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
-								s.Line()
-								s.If(Op("!").Id("ok")).Block(
-									Return(List(False(), Qual("fmt", "Errorf").Call(
-										Lit(
-											fmt.Sprintf(
-												"HasAttribute: invalid resource type %%T, wanted *%s.%s",
-												resource.Model.Path,
-												resource.Model.Name,
-											),
-										), Id("resource"),
-									))),
-								)
-							} else {
-								s.If(Id("resource").Op("!=").Nil()).Block(
-									Return(List(False(), Qual("fmt", "Errorf").Call(
-										Lit("HasAttribute: invalid resource type %T, wanted nil"), Id("resource"),
-									))),
-								)
-							}
-						}),
-						Return(Id("r").Dot("root").Dot(pascal(resource.Name)).Call().Dot("HasAttribute"+pascal(attr.Name)).Call(
+					group.Case(Id("Attribute" + pascal(resource.Name) + pascal(attr.Name))).BlockFunc(func(group *Group) {
+						if resource.Model != nil {
+							group.List(Id(resource.Name), Id("ok")).Op(":=").
+								Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
+							group.If(Op("!").Id("ok")).Block(
+								Return(List(False(), Qual("fmt", "Errorf").Call(
+									Lit(
+										fmt.Sprintf(
+											"HasAttribute: invalid resource type %%T, wanted *%s.%s",
+											resource.Model.Path,
+											resource.Model.Name,
+										),
+									), Id("resource"),
+								))),
+							)
+							group.If(Id(resource.Name).Op("==").Nil()).Block(
+								Return(List(False(), Qual("fmt", "Errorf").Call(
+									Lit(fmt.Sprintf("HasRole: got nil %s", resource.Name)),
+								))),
+							)
+						} else {
+							group.If(Id("resource").Op("!=").Nil()).Block(
+								Return(List(False(), Qual("fmt", "Errorf").Call(
+									Lit("HasAttribute: invalid resource type %T, wanted nil"), Id("resource"),
+								))),
+							)
+						}
+						group.Return(Id("r").Dot("root").Dot(pascal(resource.Name)).Call().Dot("HasAttribute"+pascal(attr.Name)).Call(
 							Id("ctx"),
 							Do(func(s *Statement) {
 								if resource.Model != nil {
 									s.Id(resource.Name)
 								}
 							}),
-						)),
-					)
+						))
+					})
 				}
 			}
 		}),

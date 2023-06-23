@@ -26,107 +26,50 @@ type authorizerResult struct {
 	error  error
 }
 
-func (a authorizer) checkAttributes(ctx context.Context, wg *conc.WaitGroup, results chan<- authorizerResult, resource any, attributes []Attribute) {
-	for _, attribute := range attributes {
-		attribute := attribute
-		wg.Go(func() {
-			allow, err := a.resolver.HasAttribute(ctx, resource, attribute)
-			results <- authorizerResult{
-				allow:  allow,
-				error:  err,
-				source: fmt.Sprintf("attribute %s", attribute),
-			}
-		})
-	}
-}
-
-func (a authorizer) checkRoles(ctx context.Context, wg *conc.WaitGroup, results chan<- authorizerResult, actor *models.User, resource any, roles []Role) {
-	for _, role := range roles {
-		role := role
-		wg.Go(func() {
-			allow, err := a.resolver.HasRole(ctx, actor, resource, role)
-			results <- authorizerResult{
-				allow:  allow,
-				error:  err,
-				source: fmt.Sprintf("role %s", role),
-			}
-		})
-	}
-}
-
-func (a authorizer) checkGlobal(ctx context.Context, wg *conc.WaitGroup, results chan<- authorizerResult, actor *models.User, action Permission, resource any) {
-	switch action {
-	case PermissionGlobalReadAllProfiles:
-		a.checkAttributes(ctx, wg, results, resource, []Attribute{
-			AttributeGlobalProfilesArePublic,
-		})
-	}
-	if actor != nil {
-		switch action {
-		case PermissionGlobalReadAllUsers:
-			a.checkRoles(ctx, wg, results, actor, resource, []Role{
-				RoleGlobalAdmin,
-			})
-		case PermissionGlobalWriteAllUsers:
-			a.checkRoles(ctx, wg, results, actor, resource, []Role{
-				RoleGlobalAdmin,
-			})
-		}
-	}
-}
-
-func (a authorizer) checkRepository(ctx context.Context, wg *conc.WaitGroup, results chan<- authorizerResult, actor *models.User, action Permission, resource any) {
-	switch action {
-	case PermissionRepositoryRead:
-		a.checkAttributes(ctx, wg, results, resource, []Attribute{
-			AttributeRepositoryPublic,
-		})
-	}
-	if actor != nil {
-		switch action {
-		case PermissionRepositoryRead:
-			a.checkRoles(ctx, wg, results, actor, resource, []Role{
-				RoleRepositoryOwner,
-				RoleRepositoryEditor,
-				RoleRepositoryViewer,
-			})
-		case PermissionRepositoryPush:
-			a.checkRoles(ctx, wg, results, actor, resource, []Role{
-				RoleRepositoryOwner,
-				RoleRepositoryEditor,
-			})
-		case PermissionRepositoryDelete:
-			a.checkRoles(ctx, wg, results, actor, resource, []Role{
-				RoleRepositoryOwner,
-			})
-		case PermissionRepositorySnakeCase:
-			a.checkRoles(ctx, wg, results, actor, resource, []Role{
-				RoleRepositoryOwner,
-			})
-		}
-	}
-}
-
-func (a authorizer) checkUser(ctx context.Context, wg *conc.WaitGroup, results chan<- authorizerResult, actor *models.User, action Permission, resource any) {
-	if actor != nil {
-		switch action {
-		case PermissionUserRead:
-			a.checkRoles(ctx, wg, results, actor, resource, []Role{
-				RoleUserAdmin,
-				RoleUserSelf,
-				RoleUserViewer,
-			})
-		case PermissionUserWrite:
-			a.checkRoles(ctx, wg, results, actor, resource, []Role{
-				RoleUserAdmin,
-				RoleUserSelf,
-			})
-		case PermissionUserDelete:
-			a.checkRoles(ctx, wg, results, actor, resource, []Role{
-				RoleUserAdmin,
-			})
-		}
-	}
+var authorizerData = map[Permission]struct {
+	Attributes []Attribute
+	Roles      []Role
+}{
+	PermissionGlobalReadAllProfiles: {
+		Attributes: []Attribute{AttributeGlobalProfilesArePublic},
+		Roles:      []Role{},
+	},
+	PermissionGlobalReadAllUsers: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleGlobalAdmin},
+	},
+	PermissionGlobalWriteAllUsers: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleGlobalAdmin},
+	},
+	PermissionRepositoryDelete: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleRepositoryOwner},
+	},
+	PermissionRepositoryPush: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleRepositoryOwner, RoleRepositoryEditor},
+	},
+	PermissionRepositoryRead: {
+		Attributes: []Attribute{AttributeRepositoryPublic},
+		Roles:      []Role{RoleRepositoryOwner, RoleRepositoryEditor, RoleRepositoryViewer},
+	},
+	PermissionRepositorySnakeCase: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleRepositoryOwner},
+	},
+	PermissionUserDelete: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleUserAdmin},
+	},
+	PermissionUserRead: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleUserAdmin, RoleUserSelf, RoleUserViewer},
+	},
+	PermissionUserWrite: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleUserAdmin, RoleUserSelf},
+	},
 }
 
 // Authorizer
@@ -142,22 +85,34 @@ func (a authorizer) Authorize(ctx context.Context, actor *models.User, permissio
 	results := make(chan authorizerResult)
 	var wg conc.WaitGroup
 
-	switch permission {
-	case PermissionGlobalReadAllUsers,
-		PermissionGlobalWriteAllUsers,
-		PermissionGlobalReadAllProfiles:
-		a.checkGlobal(ctx, &wg, results, actor, permission, resource)
-	case PermissionRepositoryRead,
-		PermissionRepositoryPush,
-		PermissionRepositoryDelete,
-		PermissionRepositorySnakeCase:
-		a.checkRepository(ctx, &wg, results, actor, permission, resource)
-	case PermissionUserRead,
-		PermissionUserWrite,
-		PermissionUserDelete:
-		a.checkUser(ctx, &wg, results, actor, permission, resource)
-	default:
+	authorizerData, ok := authorizerData[permission]
+	if !ok {
 		return fmt.Errorf("invalid permission %s", permission)
+	}
+
+	for _, attribute := range authorizerData.Attributes {
+		attribute := attribute
+		wg.Go(func() {
+			allow, err := a.resolver.HasAttribute(ctx, resource, attribute)
+			results <- authorizerResult{
+				allow:  allow,
+				error:  err,
+				source: fmt.Sprintf("attribute %s", attribute),
+			}
+		})
+	}
+	if actor != nil {
+		for _, role := range authorizerData.Roles {
+			role := role
+			wg.Go(func() {
+				allow, err := a.resolver.HasRole(ctx, actor, resource, role)
+				results <- authorizerResult{
+					allow:  allow,
+					error:  err,
+					source: fmt.Sprintf("role %s", role),
+				}
+			})
+		}
 	}
 
 	go func() {

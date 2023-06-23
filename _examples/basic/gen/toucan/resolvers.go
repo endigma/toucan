@@ -106,6 +106,9 @@ func (r resolver) HasAttribute(ctx context.Context, resource any, attribute Attr
 		if !ok {
 			return false, fmt.Errorf("HasAttribute: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.Repository", resource)
 		}
+		if repository == nil {
+			return false, fmt.Errorf("HasRole: got nil repository")
+		}
 		return r.root.Repository().HasAttributePublic(ctx, repository)
 	}
 	return false, fmt.Errorf("HasAttribute: unmatched: %s: %w", attribute, Deny)
