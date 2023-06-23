@@ -54,186 +54,79 @@ func (a authorizer) checkRoles(ctx context.Context, wg *conc.WaitGroup, results 
 	}
 }
 
-func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, action Permission, resource any) error {
-	var cancel func()
-	ctx, cancel = context.WithCancel(ctx)
-	defer cancel()
-
-	results := make(chan authorizerResult)
-	var wg conc.WaitGroup
-
+func (a authorizer) checkGlobal(ctx context.Context, wg *conc.WaitGroup, results chan<- authorizerResult, actor *models.User, action Permission, resource any) {
 	switch action {
 	case PermissionGlobalReadAllProfiles:
-		a.checkAttributes(ctx, &wg, results, resource, []Attribute{
+		a.checkAttributes(ctx, wg, results, resource, []Attribute{
 			AttributeGlobalProfilesArePublic,
 		})
 	}
-
 	if actor != nil {
 		switch action {
 		case PermissionGlobalReadAllUsers:
-			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+			a.checkRoles(ctx, wg, results, actor, resource, []Role{
 				RoleGlobalAdmin,
 			})
 		case PermissionGlobalWriteAllUsers:
-			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+			a.checkRoles(ctx, wg, results, actor, resource, []Role{
 				RoleGlobalAdmin,
 			})
 		}
 	}
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	var denyReasons []string
-	for result := range results {
-		if errors.Is(result.error, context.Canceled) {
-			continue
-		}
-		if result.error != nil {
-			cancel()
-			for range results {
-				// drain channel
-			}
-			return result.error
-		}
-		if result.allow {
-			cancel()
-			for range results {
-				// drain channel
-			}
-			return fmt.Errorf("authorize global: %w: has %s", Allow, result.source)
-		}
-		denyReasons = append(denyReasons, fmt.Sprintf("%s", result.source))
-	}
-	return fmt.Errorf("authorize global: %w: missing %s", Deny, strings.Join(denyReasons, ", "))
 }
 
-func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User, action Permission, resource any) error {
-	var cancel func()
-	ctx, cancel = context.WithCancel(ctx)
-	defer cancel()
-
-	results := make(chan authorizerResult)
-	var wg conc.WaitGroup
-
+func (a authorizer) checkRepository(ctx context.Context, wg *conc.WaitGroup, results chan<- authorizerResult, actor *models.User, action Permission, resource any) {
 	switch action {
 	case PermissionRepositoryRead:
-		a.checkAttributes(ctx, &wg, results, resource, []Attribute{
+		a.checkAttributes(ctx, wg, results, resource, []Attribute{
 			AttributeRepositoryPublic,
 		})
 	}
-
 	if actor != nil {
 		switch action {
 		case PermissionRepositoryRead:
-			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+			a.checkRoles(ctx, wg, results, actor, resource, []Role{
 				RoleRepositoryOwner,
 				RoleRepositoryEditor,
 				RoleRepositoryViewer,
 			})
 		case PermissionRepositoryPush:
-			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+			a.checkRoles(ctx, wg, results, actor, resource, []Role{
 				RoleRepositoryOwner,
 				RoleRepositoryEditor,
 			})
 		case PermissionRepositoryDelete:
-			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+			a.checkRoles(ctx, wg, results, actor, resource, []Role{
 				RoleRepositoryOwner,
 			})
 		case PermissionRepositorySnakeCase:
-			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+			a.checkRoles(ctx, wg, results, actor, resource, []Role{
 				RoleRepositoryOwner,
 			})
 		}
 	}
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	var denyReasons []string
-	for result := range results {
-		if errors.Is(result.error, context.Canceled) {
-			continue
-		}
-		if result.error != nil {
-			cancel()
-			for range results {
-				// drain channel
-			}
-			return result.error
-		}
-		if result.allow {
-			cancel()
-			for range results {
-				// drain channel
-			}
-			return fmt.Errorf("authorize repository: %w: has %s", Allow, result.source)
-		}
-		denyReasons = append(denyReasons, fmt.Sprintf("%s", result.source))
-	}
-	return fmt.Errorf("authorize repository: %w: missing %s", Deny, strings.Join(denyReasons, ", "))
 }
 
-func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, action Permission, resource any) error {
-	var cancel func()
-	ctx, cancel = context.WithCancel(ctx)
-	defer cancel()
-
-	results := make(chan authorizerResult)
-	var wg conc.WaitGroup
-
+func (a authorizer) checkUser(ctx context.Context, wg *conc.WaitGroup, results chan<- authorizerResult, actor *models.User, action Permission, resource any) {
 	if actor != nil {
 		switch action {
 		case PermissionUserRead:
-			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+			a.checkRoles(ctx, wg, results, actor, resource, []Role{
 				RoleUserAdmin,
 				RoleUserSelf,
 				RoleUserViewer,
 			})
 		case PermissionUserWrite:
-			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+			a.checkRoles(ctx, wg, results, actor, resource, []Role{
 				RoleUserAdmin,
 				RoleUserSelf,
 			})
 		case PermissionUserDelete:
-			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+			a.checkRoles(ctx, wg, results, actor, resource, []Role{
 				RoleUserAdmin,
 			})
 		}
 	}
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	var denyReasons []string
-	for result := range results {
-		if errors.Is(result.error, context.Canceled) {
-			continue
-		}
-		if result.error != nil {
-			cancel()
-			for range results {
-				// drain channel
-			}
-			return result.error
-		}
-		if result.allow {
-			cancel()
-			for range results {
-				// drain channel
-			}
-			return fmt.Errorf("authorize user: %w: has %s", Allow, result.source)
-		}
-		denyReasons = append(denyReasons, fmt.Sprintf("%s", result.source))
-	}
-	return fmt.Errorf("authorize user: %w: missing %s", Deny, strings.Join(denyReasons, ", "))
 }
 
 // Authorizer
@@ -242,23 +135,59 @@ type authorizer struct {
 }
 
 func (a authorizer) Authorize(ctx context.Context, actor *models.User, permission Permission, resource any) error {
+	var cancel func()
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+
+	results := make(chan authorizerResult)
+	var wg conc.WaitGroup
+
 	switch permission {
 	case PermissionGlobalReadAllUsers,
 		PermissionGlobalWriteAllUsers,
 		PermissionGlobalReadAllProfiles:
-		return a.authorizeGlobal(ctx, actor, permission, resource)
+		a.checkGlobal(ctx, &wg, results, actor, permission, resource)
 	case PermissionRepositoryRead,
 		PermissionRepositoryPush,
 		PermissionRepositoryDelete,
 		PermissionRepositorySnakeCase:
-		return a.authorizeRepository(ctx, actor, permission, resource)
+		a.checkRepository(ctx, &wg, results, actor, permission, resource)
 	case PermissionUserRead,
 		PermissionUserWrite,
 		PermissionUserDelete:
-		return a.authorizeUser(ctx, actor, permission, resource)
+		a.checkUser(ctx, &wg, results, actor, permission, resource)
+	default:
+		return fmt.Errorf("invalid permission %s", permission)
 	}
 
-	return fmt.Errorf("invalid permission %s", permission)
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var denyReasons []string
+	for result := range results {
+		if errors.Is(result.error, context.Canceled) {
+			continue
+		}
+		if result.error != nil {
+			cancel()
+			for range results {
+				// drain channel
+			}
+			return result.error
+		}
+		if result.allow {
+			cancel()
+			for range results {
+				// drain channel
+			}
+			return fmt.Errorf("authorize %s: %w: has %s", permission, Allow, result.source)
+		}
+		denyReasons = append(denyReasons, fmt.Sprintf("%s", result.source))
+	}
+
+	return fmt.Errorf("authorize %s: %w: missing %s", permission, Deny, strings.Join(denyReasons, ", "))
 }
 
 func NewAuthorizer(resolver Resolver) Authorizer {
