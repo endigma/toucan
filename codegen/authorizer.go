@@ -43,14 +43,23 @@ func (gen *Generator) generateAuthorizerTypes(file *File) {
 	)
 }
 
-//nolint:gocognit
+//nolint:gocognit,cyclop
 func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.ResourceSchema) {
 	file.Line().Func().
 		Params(
 			Id("a").Id("authorizer"),
 		).
-		Id("authorize" + pascal(resource.Name)).
-		ParamsFunc(paramsForAuthorizer(gen.Schema.Actor, resource)).Add(Error()).
+		Id("authorize"+pascal(resource.Name)).
+		Params(
+			Id("ctx").Qual("context", "Context"),
+			Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
+			Id("action").Id("Permission"),
+			Do(func(s *Statement) {
+				if resource.Model != nil {
+					s.Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name)
+				}
+			}),
+		).Error().
 		BlockFunc(func(group *Group) {
 			if resource.Model != nil {
 				group.If(Id("resource").Op("==").Nil()).Block(
