@@ -113,21 +113,9 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 			Id("ctx").Qual("context", "Context"),
 			Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
 			Id("action").Id("Permission"),
-			Do(func(s *Statement) {
-				if resource.Model != nil {
-					s.Id("resource").Op("*").Qual(resource.Model.Path, resource.Model.Name)
-				}
-			}),
+			Id("resource").Id("any"),
 		).Error().
 		BlockFunc(func(group *Group) {
-			if resource.Model != nil {
-				group.If(Id("resource").Op("==").Nil()).Block(
-					Return(Qual("fmt", "Errorf").Call(
-						Lit(fmt.Sprintf("authorize %s: resource is nil", resource.Name)),
-					)),
-				)
-			}
-
 			group.Var().Id("cancel").Func().Params()
 			group.Id("ctx").Op(",").Id("cancel").Op("=").Qual("context", "WithCancel").Call(Id("ctx"))
 			group.Defer().Id("cancel").Call().Line()
@@ -235,13 +223,7 @@ func generateAuthorizerCase(
 					s.Id("actor")
 				}
 			}),
-			Do(func(s *Statement) {
-				if resource.Model != nil {
-					s.Id("resource")
-				} else {
-					s.Nil()
-				}
-			}),
+			Id("resource"),
 			Index().Id(pascal(string(sourceType))).BlockFunc(func(g *Group) {
 				for _, source := range sources {
 					g.Id(pascal(string(sourceType)) + pascal(resource.Name) + pascal(source.Name)).Op(",")
@@ -276,41 +258,9 @@ func (gen *Generator) generateAuthorizerRoot(group *Group) {
 							Id("Permission" + pascal(resource.Name) + pascal(permission))
 					}
 				}).Block(
-					Do(func(s *Statement) {
-						if resource.Model != nil {
-							s.List(Id("resource"), Op("ok")).Op(":=").Id("resource").
-								Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
-							s.Line()
-							s.If(Op("!").Id("ok")).Block(
-								Return(Qual("fmt", "Errorf").Call(
-									Lit(fmt.Sprintf(
-										"authorize: invalid resource type %%T for %s, wanted *%s.%s",
-										resource.Name, resource.Model.Path, resource.Model.Name,
-									)),
-									Id("resource"),
-								)),
-							)
-						} else {
-							s.If(Id("resource").Op("!=").Nil()).Block(
-								Return(Qual("fmt", "Errorf").Call(
-									Lit("authorize: invalid resource type %T, wanted nil"),
-									Id("resource"),
-								)),
-							)
-						}
-					}),
-					Return(
-						Id("a").
-							Dot("authorize"+pascal(resource.Name)).
-							Call(
-								Id("ctx"), Id("actor"), Id("permission"),
-								Do(func(s *Statement) {
-									if resource.Model != nil {
-										s.Id("resource")
-									}
-								}),
-							),
-					),
+					Return(Id("a").Dot("authorize"+pascal(resource.Name)).Call(
+						Id("ctx"), Id("actor"), Id("permission"), Id("resource"),
+					)),
 				)
 			}
 		}).Line()

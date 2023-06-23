@@ -41,11 +41,17 @@ func (r resolver) HasRole(ctx context.Context, actor *models.User, resource any,
 		if !ok {
 			return false, fmt.Errorf("HasRole: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.Repository", resource)
 		}
+		if repository == nil {
+			return false, fmt.Errorf("HasRole: got nil repository")
+		}
 		return r.root.Repository().HasRoleOwner(ctx, actor, repository)
 	case RoleRepositoryEditor:
 		repository, ok := resource.(*models.Repository)
 		if !ok {
 			return false, fmt.Errorf("HasRole: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.Repository", resource)
+		}
+		if repository == nil {
+			return false, fmt.Errorf("HasRole: got nil repository")
 		}
 		return r.root.Repository().HasRoleEditor(ctx, actor, repository)
 	case RoleRepositoryViewer:
@@ -53,11 +59,17 @@ func (r resolver) HasRole(ctx context.Context, actor *models.User, resource any,
 		if !ok {
 			return false, fmt.Errorf("HasRole: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.Repository", resource)
 		}
+		if repository == nil {
+			return false, fmt.Errorf("HasRole: got nil repository")
+		}
 		return r.root.Repository().HasRoleViewer(ctx, actor, repository)
 	case RoleUserAdmin:
 		user, ok := resource.(*models.User)
 		if !ok {
 			return false, fmt.Errorf("HasRole: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.User", resource)
+		}
+		if user == nil {
+			return false, fmt.Errorf("HasRole: got nil user")
 		}
 		return r.root.User().HasRoleAdmin(ctx, actor, user)
 	case RoleUserSelf:
@@ -65,16 +77,21 @@ func (r resolver) HasRole(ctx context.Context, actor *models.User, resource any,
 		if !ok {
 			return false, fmt.Errorf("HasRole: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.User", resource)
 		}
+		if user == nil {
+			return false, fmt.Errorf("HasRole: got nil user")
+		}
 		return r.root.User().HasRoleSelf(ctx, actor, user)
 	case RoleUserViewer:
 		user, ok := resource.(*models.User)
 		if !ok {
 			return false, fmt.Errorf("HasRole: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.User", resource)
 		}
+		if user == nil {
+			return false, fmt.Errorf("HasRole: got nil user")
+		}
 		return r.root.User().HasRoleViewer(ctx, actor, user)
-	default:
-		return false, fmt.Errorf("HasRole: unmatched: %s: %w", role, Deny)
 	}
+	return false, fmt.Errorf("HasRole: unmatched: %s: %w", role, Deny)
 }
 
 func (r resolver) HasAttribute(ctx context.Context, resource any, attribute Attribute) (bool, error) {
@@ -90,9 +107,8 @@ func (r resolver) HasAttribute(ctx context.Context, resource any, attribute Attr
 			return false, fmt.Errorf("HasAttribute: invalid resource type %T, wanted *github.com/endigma/toucan/_examples/basic/models.Repository", resource)
 		}
 		return r.root.Repository().HasAttributePublic(ctx, repository)
-	default:
-		return false, fmt.Errorf("HasAttribute: unmatched: %s: %w", attribute, Deny)
 	}
+	return false, fmt.Errorf("HasAttribute: unmatched: %s: %w", attribute, Deny)
 }
 
 func NewResolver(root ResolverRoot) Resolver {

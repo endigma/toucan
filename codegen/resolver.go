@@ -68,34 +68,32 @@ func (gen *Generator) generateResolverTypes(file *File) {
 		Switch(Id("role")).BlockFunc(func(group *Group) {
 			for _, resource := range gen.Schema.Resources {
 				for _, role := range resource.Roles {
-					group.Case(Id("Role"+pascal(resource.Name)+pascal(role.Name))).Block(
-						Do(func(s *Statement) {
-							if resource.Model != nil {
-								s.List(
-									Id(resource.Name),
-									Id("ok"),
-								).Op(":=").Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
-								s.Line()
-								s.If(Op("!").Id("ok")).Block(
-									Return(List(False(), Qual("fmt", "Errorf").Call(
-										Lit(
-											fmt.Sprintf(
-												"HasRole: invalid resource type %%T, wanted *%s.%s",
-												resource.Model.Path,
-												resource.Model.Name,
-											),
-										), Id("resource"),
-									))),
-								)
-							} else {
-								s.If(Id("resource").Op("!=").Nil()).Block(
-									Return(List(False(), Qual("fmt", "Errorf").Call(
-										Lit("HasRole: invalid resource type %T, wanted nil"), Id("resource"),
-									))),
-								)
-							}
-						}),
-						Return(Id("r").Dot("root").Dot(pascal(resource.Name)).Call().Dot("HasRole"+pascal(role.Name)).Call(
+					group.Case(Id("Role" + pascal(resource.Name) + pascal(role.Name))).BlockFunc(func(group *Group) {
+						if resource.Model == nil {
+							group.If(Id("resource").Op("!=").Nil()).Block(
+								Return(List(False(), Qual("fmt", "Errorf").Call(
+									Lit("HasRole: invalid resource type %T, wanted nil"), Id("resource"),
+								))),
+							)
+						} else {
+							group.List(Id(resource.Name), Id("ok")).Op(":=").
+								Id("resource").Assert(Op("*").Qual(resource.Model.Path, resource.Model.Name))
+							group.If(Op("!").Id("ok")).Block(
+								Return(List(False(), Qual("fmt", "Errorf").Call(
+									Lit(fmt.Sprintf(
+										"HasRole: invalid resource type %%T, wanted *%s.%s",
+										resource.Model.Path,
+										resource.Model.Name,
+									)), Id("resource"),
+								))),
+							)
+							group.If(Id(resource.Name).Op("==").Nil()).Block(
+								Return(List(False(), Qual("fmt", "Errorf").Call(
+									Lit(fmt.Sprintf("HasRole: got nil %s", resource.Name)),
+								))),
+							)
+						}
+						group.Return(Id("r").Dot("root").Dot(pascal(resource.Name)).Call().Dot("HasRole"+pascal(role.Name)).Call(
 							Id("ctx"),
 							Id("actor"),
 							Do(func(s *Statement) {
@@ -103,16 +101,14 @@ func (gen *Generator) generateResolverTypes(file *File) {
 									s.Id(resource.Name)
 								}
 							}),
-						)),
-					)
+						))
+					})
 				}
 			}
-			group.Default().Block(
-				Return(List(False(), Qual("fmt", "Errorf").Call(
-					Lit("HasRole: unmatched: %s: %w"), Id("role"), Id("Deny"),
-				))),
-			)
 		}),
+		Return(List(False(), Qual("fmt", "Errorf").Call(
+			Lit("HasRole: unmatched: %s: %w"), Id("role"), Id("Deny"),
+		))),
 	)
 
 	file.Line().Func().Params(
@@ -163,12 +159,10 @@ func (gen *Generator) generateResolverTypes(file *File) {
 					)
 				}
 			}
-			group.Default().Block(
-				Return(False(), Qual("fmt", "Errorf").Call(
-					Lit("HasAttribute: unmatched: %s: %w"), Id("attribute"), Id("Deny")),
-				),
-			)
 		}),
+		Return(False(), Qual("fmt", "Errorf").Call(
+			Lit("HasAttribute: unmatched: %s: %w"), Id("attribute"), Id("Deny")),
+		),
 	)
 
 	file.Line().Func().Id("NewResolver").Params(

@@ -54,7 +54,7 @@ func (a authorizer) checkRoles(ctx context.Context, wg *conc.WaitGroup, results 
 	}
 }
 
-func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, action Permission) error {
+func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, action Permission, resource any) error {
 	var cancel func()
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
@@ -64,7 +64,7 @@ func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, act
 
 	switch action {
 	case PermissionGlobalReadAllProfiles:
-		a.checkAttributes(ctx, &wg, results, nil, []Attribute{
+		a.checkAttributes(ctx, &wg, results, resource, []Attribute{
 			AttributeGlobalProfilesArePublic,
 		})
 	}
@@ -72,11 +72,11 @@ func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, act
 	if actor != nil {
 		switch action {
 		case PermissionGlobalReadAllUsers:
-			a.checkRoles(ctx, &wg, results, actor, nil, []Role{
+			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
 				RoleGlobalAdmin,
 			})
 		case PermissionGlobalWriteAllUsers:
-			a.checkRoles(ctx, &wg, results, actor, nil, []Role{
+			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
 				RoleGlobalAdmin,
 			})
 		}
@@ -111,10 +111,7 @@ func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, act
 	return fmt.Errorf("authorize global: %w: missing %s", Deny, strings.Join(denyReasons, ", "))
 }
 
-func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User, action Permission, resource *models.Repository) error {
-	if resource == nil {
-		return fmt.Errorf("authorize repository: resource is nil")
-	}
+func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User, action Permission, resource any) error {
 	var cancel func()
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
@@ -182,10 +179,7 @@ func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User,
 	return fmt.Errorf("authorize repository: %w: missing %s", Deny, strings.Join(denyReasons, ", "))
 }
 
-func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, action Permission, resource *models.User) error {
-	if resource == nil {
-		return fmt.Errorf("authorize user: resource is nil")
-	}
+func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, action Permission, resource any) error {
 	var cancel func()
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
@@ -252,26 +246,15 @@ func (a authorizer) Authorize(ctx context.Context, actor *models.User, permissio
 	case PermissionGlobalReadAllUsers,
 		PermissionGlobalWriteAllUsers,
 		PermissionGlobalReadAllProfiles:
-		if resource != nil {
-			return fmt.Errorf("authorize: invalid resource type %T, wanted nil", resource)
-		}
-		return a.authorizeGlobal(ctx, actor, permission)
+		return a.authorizeGlobal(ctx, actor, permission, resource)
 	case PermissionRepositoryRead,
 		PermissionRepositoryPush,
 		PermissionRepositoryDelete,
 		PermissionRepositorySnakeCase:
-		resource, ok := resource.(*models.Repository)
-		if !ok {
-			return fmt.Errorf("authorize: invalid resource type %T for repository, wanted *github.com/endigma/toucan/_examples/basic/models.Repository", resource)
-		}
 		return a.authorizeRepository(ctx, actor, permission, resource)
 	case PermissionUserRead,
 		PermissionUserWrite,
 		PermissionUserDelete:
-		resource, ok := resource.(*models.User)
-		if !ok {
-			return fmt.Errorf("authorize: invalid resource type %T for user, wanted *github.com/endigma/toucan/_examples/basic/models.User", resource)
-		}
 		return a.authorizeUser(ctx, actor, permission, resource)
 	}
 
