@@ -41,9 +41,68 @@ func (gen *Generator) generateAuthorizerTypes(file *File) {
 			Id("resource"),
 		)),
 	)
+
+	file.Line().Type().Id("authorizerResult").Struct(
+		Id("allow").Bool(),
+		Id("source").String(),
+		Id("error").Error(),
+	)
+
+	file.Line().Func().Params(
+		Id("a").Id("authorizer"),
+	).Id("checkAttributes").Params(
+		Id("ctx").Qual("context", "Context"),
+		Id("wg").Op("*").Qual("github.com/sourcegraph/conc", "WaitGroup"),
+		Id("results").Chan().Op("<-").Id("authorizerResult"),
+		Id("resource").Any(),
+		Id("attributes").Index().Id("Attribute"),
+	).Block(
+		For(List(Id("_"), Id("attribute")).Op(":=").Range().Id("attributes")).Block(
+			Id("attribute").Op(":=").Id("attribute"),
+			Id("wg").Dot("Go").Call(Func().Params().Block(
+				List(Id("allow"), Id("err")).Op(":=").Id("a").Dot("resolver").Dot("HasAttribute").Call(
+					Id("ctx"),
+					Id("resource"),
+					Id("attribute"),
+				),
+				Id("results").Op("<-").Id("authorizerResult").Values(Dict{
+					Id("allow"):  Id("allow"),
+					Id("source"): Qual("fmt", "Sprintf").Call(Lit("attribute %s"), Id("attribute")),
+					Id("error"):  Err(),
+				}),
+			)),
+		),
+	)
+
+	file.Line().Func().Params(
+		Id("a").Id("authorizer"),
+	).Id("checkRoles").Params(
+		Id("ctx").Qual("context", "Context"),
+		Id("wg").Op("*").Qual("github.com/sourcegraph/conc", "WaitGroup"),
+		Id("results").Chan().Op("<-").Id("authorizerResult"),
+		Id("actor").Op("*").Qual(gen.Schema.Actor.Path, gen.Schema.Actor.Name),
+		Id("resource").Any(),
+		Id("roles").Index().Id("Role"),
+	).Block(
+		For(List(Id("_"), Id("role")).Op(":=").Range().Id("roles")).Block(
+			Id("role").Op(":=").Id("role"),
+			Id("wg").Dot("Go").Call(Func().Params().Block(
+				List(Id("allow"), Id("err")).Op(":=").Id("a").Dot("resolver").Dot("HasRole").Call(
+					Id("ctx"),
+					Id("actor"),
+					Id("resource"),
+					Id("role"),
+				),
+				Id("results").Op("<-").Id("authorizerResult").Values(Dict{
+					Id("allow"):  Id("allow"),
+					Id("source"): Qual("fmt", "Sprintf").Call(Lit("role %s"), Id("role")),
+					Id("error"):  Err(),
+				}),
+			)),
+		),
+	)
 }
 
-//nolint:gocognit,cyclop
 func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.ResourceSchema) {
 	file.Line().Func().
 		Params(
@@ -73,27 +132,19 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 			group.Id("ctx").Op(",").Id("cancel").Op("=").Qual("context", "WithCancel").Call(Id("ctx"))
 			group.Defer().Id("cancel").Call().Line()
 
-			group.Id("results").Op(":=").Make(Chan().Struct(
-				Id("allow").Bool(),
-				Id("source").String(),
-				Id("error").Error(),
-			))
+			group.Id("results").Op(":=").Make(Chan().Id("authorizerResult"))
 
 			group.Var().Id("wg").Add(ConcWaitGroup()).Line()
 
 			if len(resource.Attributes) > 0 {
 				group.Switch(Id("action")).BlockFunc(func(group *Group) {
-					for i, permission := range resource.Permissions {
+					for _, permission := range resource.Permissions {
 						sources := resource.GetAttributeSources(permission)
 						if len(sources) == 0 {
 							continue
 						}
 
-						if i > 0 {
-							group.Line()
-						}
-
-						generateAuthorizerCase(group, resource, permission, sources)
+						generateAuthorizerCase(group, resource, permission, schema.PermissionTypeAttribute, sources)
 					}
 				})
 			}
@@ -103,17 +154,13 @@ func (gen *Generator) generateResourceAuthorizer(file *File, resource schema.Res
 			if len(resource.Roles) > 0 {
 				group.If(Id("actor").Op("!=").Nil()).Block(
 					Switch(Id("action")).BlockFunc(func(group *Group) {
-						for i, permission := range resource.Permissions {
+						for _, permission := range resource.Permissions {
 							sources := resource.GetRoleSources(permission)
 							if len(sources) == 0 {
 								continue
 							}
 
-							if i > 0 {
-								group.Line()
-							}
-
-							generateAuthorizerCase(group, resource, permission, sources)
+							generateAuthorizerCase(group, resource, permission, schema.PermissionTypeRole, sources)
 						}
 					}),
 				).Line()
@@ -168,52 +215,40 @@ func generateAuthorizerCase(
 	group *Group,
 	resource schema.ResourceSchema,
 	perm string,
+	sourceType schema.PermissionType,
 	sources []schema.PermissionSource,
 ) {
-	group.Case(Id("Permission" + pascal(resource.Name) + pascal(perm))).
-		BlockFunc(
-			func(group *Group) {
-				for i, source := range sources {
-					if i > 0 {
-						group.Line()
-					}
-					group.Commentf("Source: %s - %s", source.Type, source.Name)
-					group.Id("wg").Dot("Go").Call(Func().Params().Block(
-						List(Id("allow"), Err()).Op(":=").Id("a").Dot("resolver").Do(func(s *Statement) {
-							switch source.Type {
-							case schema.PermissionTypeRole:
-								s.Dot("HasRole")
-							case schema.PermissionTypeAttribute:
-								s.Dot("HasAttribute")
-							}
-						}).Call(
-							Id("ctx"),
-							Do(func(s *Statement) {
-								if source.Type == schema.PermissionTypeRole {
-									s.Id("actor")
-								}
-							}),
-							Do(func(s *Statement) {
-								if resource.Model != nil {
-									s.Id("resource")
-								} else {
-									s.Nil()
-								}
-							}),
-							Id(pascal(string(source.Type))+pascal(resource.Name)+pascal(source.Name)),
-						),
-						Id("results").Op("<-").Struct(
-							Id("allow").Bool(),
-							Id("source").String(),
-							Id("error").Error(),
-						).Values(Dict{
-							Id("allow"):  Id("allow"),
-							Id("source"): Lit(fmt.Sprintf("%s %s", source.Name, source.Type)),
-							Id("error"):  Err(),
-						}),
-					))
+	group.Case(Id("Permission" + pascal(resource.Name) + pascal(perm))).Block(
+		Id("a").Do(func(s *Statement) {
+			switch sourceType {
+			case schema.PermissionTypeAttribute:
+				s.Dot("checkAttributes")
+			case schema.PermissionTypeRole:
+				s.Dot("checkRoles")
+			}
+		}).Call(
+			Id("ctx"),
+			Op("&").Id("wg"),
+			Id("results"),
+			Do(func(s *Statement) {
+				if sourceType == schema.PermissionTypeRole {
+					s.Id("actor")
 				}
-			})
+			}),
+			Do(func(s *Statement) {
+				if resource.Model != nil {
+					s.Id("resource")
+				} else {
+					s.Nil()
+				}
+			}),
+			Index().Id(pascal(string(sourceType))).BlockFunc(func(g *Group) {
+				for _, source := range sources {
+					g.Id(pascal(string(sourceType)) + pascal(resource.Name) + pascal(source.Name)).Op(",")
+				}
+			}),
+		),
+	)
 }
 
 func (gen *Generator) generateAuthorizerRoot(group *Group) {

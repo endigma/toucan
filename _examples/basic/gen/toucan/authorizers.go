@@ -20,66 +20,64 @@ func (af AuthorizerFunc) Authorize(ctx context.Context, actor *models.User, perm
 	return af(ctx, actor, permission, resource)
 }
 
+type authorizerResult struct {
+	allow  bool
+	source string
+	error  error
+}
+
+func (a authorizer) checkAttributes(ctx context.Context, wg *conc.WaitGroup, results chan<- authorizerResult, resource any, attributes []Attribute) {
+	for _, attribute := range attributes {
+		attribute := attribute
+		wg.Go(func() {
+			allow, err := a.resolver.HasAttribute(ctx, resource, attribute)
+			results <- authorizerResult{
+				allow:  allow,
+				error:  err,
+				source: fmt.Sprintf("attribute %s", attribute),
+			}
+		})
+	}
+}
+
+func (a authorizer) checkRoles(ctx context.Context, wg *conc.WaitGroup, results chan<- authorizerResult, actor *models.User, resource any, roles []Role) {
+	for _, role := range roles {
+		role := role
+		wg.Go(func() {
+			allow, err := a.resolver.HasRole(ctx, actor, resource, role)
+			results <- authorizerResult{
+				allow:  allow,
+				error:  err,
+				source: fmt.Sprintf("role %s", role),
+			}
+		})
+	}
+}
+
 func (a authorizer) authorizeGlobal(ctx context.Context, actor *models.User, action Permission) error {
 	var cancel func()
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
 
-	results := make(chan struct {
-		allow  bool
-		source string
-		error  error
-	})
+	results := make(chan authorizerResult)
 	var wg conc.WaitGroup
 
 	switch action {
-
 	case PermissionGlobalReadAllProfiles:
-		// Source: attribute - profiles_are_public
-		wg.Go(func() {
-			allow, err := a.resolver.HasAttribute(ctx, nil, AttributeGlobalProfilesArePublic)
-			results <- struct {
-				allow  bool
-				source string
-				error  error
-			}{
-				allow:  allow,
-				error:  err,
-				source: "profiles_are_public attribute",
-			}
+		a.checkAttributes(ctx, &wg, results, nil, []Attribute{
+			AttributeGlobalProfilesArePublic,
 		})
 	}
 
 	if actor != nil {
 		switch action {
 		case PermissionGlobalReadAllUsers:
-			// Source: role - admin
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, nil, RoleGlobalAdmin)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "admin role",
-				}
+			a.checkRoles(ctx, &wg, results, actor, nil, []Role{
+				RoleGlobalAdmin,
 			})
-
 		case PermissionGlobalWriteAllUsers:
-			// Source: role - admin
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, nil, RoleGlobalAdmin)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "admin role",
-				}
+			a.checkRoles(ctx, &wg, results, actor, nil, []Role{
+				RoleGlobalAdmin,
 			})
 		}
 	}
@@ -121,132 +119,36 @@ func (a authorizer) authorizeRepository(ctx context.Context, actor *models.User,
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
 
-	results := make(chan struct {
-		allow  bool
-		source string
-		error  error
-	})
+	results := make(chan authorizerResult)
 	var wg conc.WaitGroup
 
 	switch action {
 	case PermissionRepositoryRead:
-		// Source: attribute - public
-		wg.Go(func() {
-			allow, err := a.resolver.HasAttribute(ctx, resource, AttributeRepositoryPublic)
-			results <- struct {
-				allow  bool
-				source string
-				error  error
-			}{
-				allow:  allow,
-				error:  err,
-				source: "public attribute",
-			}
+		a.checkAttributes(ctx, &wg, results, resource, []Attribute{
+			AttributeRepositoryPublic,
 		})
 	}
 
 	if actor != nil {
 		switch action {
 		case PermissionRepositoryRead:
-			// Source: role - owner
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "owner role",
-				}
+			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+				RoleRepositoryOwner,
+				RoleRepositoryEditor,
+				RoleRepositoryViewer,
 			})
-
-			// Source: role - editor
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryEditor)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "editor role",
-				}
-			})
-
-			// Source: role - viewer
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryViewer)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "viewer role",
-				}
-			})
-
 		case PermissionRepositoryPush:
-			// Source: role - owner
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "owner role",
-				}
+			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+				RoleRepositoryOwner,
+				RoleRepositoryEditor,
 			})
-
-			// Source: role - editor
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryEditor)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "editor role",
-				}
-			})
-
 		case PermissionRepositoryDelete:
-			// Source: role - owner
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "owner role",
-				}
+			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+				RoleRepositoryOwner,
 			})
-
 		case PermissionRepositorySnakeCase:
-			// Source: role - owner
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleRepositoryOwner)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "owner role",
-				}
+			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+				RoleRepositoryOwner,
 			})
 		}
 	}
@@ -288,100 +190,25 @@ func (a authorizer) authorizeUser(ctx context.Context, actor *models.User, actio
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
 
-	results := make(chan struct {
-		allow  bool
-		source string
-		error  error
-	})
+	results := make(chan authorizerResult)
 	var wg conc.WaitGroup
 
 	if actor != nil {
 		switch action {
 		case PermissionUserRead:
-			// Source: role - admin
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleUserAdmin)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "admin role",
-				}
+			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+				RoleUserAdmin,
+				RoleUserSelf,
+				RoleUserViewer,
 			})
-
-			// Source: role - self
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleUserSelf)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "self role",
-				}
-			})
-
-			// Source: role - viewer
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleUserViewer)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "viewer role",
-				}
-			})
-
 		case PermissionUserWrite:
-			// Source: role - admin
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleUserAdmin)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "admin role",
-				}
+			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+				RoleUserAdmin,
+				RoleUserSelf,
 			})
-
-			// Source: role - self
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleUserSelf)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "self role",
-				}
-			})
-
 		case PermissionUserDelete:
-			// Source: role - admin
-			wg.Go(func() {
-				allow, err := a.resolver.HasRole(ctx, actor, resource, RoleUserAdmin)
-				results <- struct {
-					allow  bool
-					source string
-					error  error
-				}{
-					allow:  allow,
-					error:  err,
-					source: "admin role",
-				}
+			a.checkRoles(ctx, &wg, results, actor, resource, []Role{
+				RoleUserAdmin,
 			})
 		}
 	}
