@@ -34,10 +34,32 @@ func (s *Schema) Validate() error {
 		}
 	}
 
+	seenAttributeAndRoleNames := map[string]struct{}{}
+
 	for _, resource := range s.Resources {
 		err := resource.Validate()
 		if err != nil {
 			result = multierror.Append(result, err)
+		}
+
+		// Catch duplicate attribute and role names
+		for _, attr := range resource.Attributes {
+			qualName := fmt.Sprintf("%s.%s", resource.Name, attr.Name)
+			if _, ok := seenAttributeAndRoleNames[qualName]; ok {
+				result = multierror.Append(result, fmt.Errorf("%w: %q", ErrInvalidSchema, qualName))
+			}
+
+			seenAttributeAndRoleNames[qualName] = struct{}{}
+		}
+
+		// Catch duplicate attribute and role names
+		for _, role := range resource.Roles {
+			qualName := fmt.Sprintf("%s.%s", resource.Name, role.Name)
+			if _, ok := seenAttributeAndRoleNames[qualName]; ok {
+				result = multierror.Append(result, fmt.Errorf("%w: %q", ErrInvalidSchema, qualName))
+			}
+
+			seenAttributeAndRoleNames[qualName] = struct{}{}
 		}
 	}
 

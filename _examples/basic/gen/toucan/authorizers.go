@@ -3,437 +3,148 @@ package toucan
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	models "github.com/endigma/toucan/_examples/basic/models"
-	cache "github.com/endigma/toucan/cache"
-	decision "github.com/endigma/toucan/decision"
 	conc "github.com/sourcegraph/conc"
 	"strings"
 )
 
-func (a Authorizer) AuthorizeGlobal(ctx context.Context, actor *models.User, action GlobalPermission) decision.Decision {
-	resolver := a.Global()
-
-	if !action.Valid() {
-		return decision.Error(ErrInvalidGlobalPermission)
-	}
-
-	var cancel func()
-	ctx, cancel = context.WithCancel(ctx)
-	defer cancel()
-
-	results := make(chan decision.Decision)
-
-	var wg conc.WaitGroup
-
-	switch action {
-	case GlobalPermissionReadAllProfiles:
-		// Source: attribute - ProfilesArePublic
-		wg.Go(func() {
-			results <- cache.Query(ctx, cache.CacheKey{
-				ActorKey:    "",
-				Resource:    "global",
-				ResourceKey: "",
-				SourceType:  "attribute",
-				SourceName:  "ProfilesArePublic",
-			}, func() decision.Decision {
-				return resolver.HasAttributeProfilesArePublic(ctx)
-			})
-		})
-
-	}
-	if actor != nil {
-		switch action {
-		case GlobalPermissionReadAllUsers:
-			// Source: role - Admin
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "global",
-					ResourceKey: "",
-					SourceType:  "role",
-					SourceName:  "Admin",
-				}, func() decision.Decision {
-					return resolver.HasRoleAdmin(ctx, actor)
-				})
-			})
-
-		case GlobalPermissionWriteAllUsers:
-			// Source: role - Admin
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "global",
-					ResourceKey: "",
-					SourceType:  "role",
-					SourceName:  "Admin",
-				}, func() decision.Decision {
-					return resolver.HasRoleAdmin(ctx, actor)
-				})
-			})
-
-		}
-	}
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	var allowReason string
-	var denyReasons []string
-	for result := range results {
-		if result.Reason == "" {
-			result.Reason = "unspecified"
-		}
-		if result.Allow {
-			cancel()
-			allowReason = result.Reason
-		} else {
-			denyReasons = append(denyReasons, result.Reason)
-		}
-	}
-
-	if allowReason != "" {
-		return decision.True(allowReason)
-	} else {
-		result := decision.False(strings.Join(denyReasons, ", "))
-		if result.Reason == "" {
-			result.Reason = "unspecified"
-		}
-		return result
-	}
+type Authorizer interface {
+	Authorize(ctx context.Context, actor *models.User, permission Permission, resource any) error
 }
 
-func (a Authorizer) AuthorizeRepository(ctx context.Context, actor *models.User, action RepositoryPermission, resource *models.Repository) decision.Decision {
-	resolver := a.Repository()
+type AuthorizerFunc func(ctx context.Context, actor *models.User, permission Permission, resource any) error
 
-	if !action.Valid() {
-		return decision.Error(ErrInvalidRepositoryPermission)
-	}
-
-	if resource == nil {
-		return decision.False("unmatched")
-	}
-	var cancel func()
-	ctx, cancel = context.WithCancel(ctx)
-	defer cancel()
-
-	results := make(chan decision.Decision)
-
-	var wg conc.WaitGroup
-
-	switch action {
-	case RepositoryPermissionRead:
-		// Source: attribute - Public
-		wg.Go(func() {
-			results <- cache.Query(ctx, cache.CacheKey{
-				ActorKey:    "",
-				Resource:    "repository",
-				ResourceKey: resolver.CacheKey(resource),
-				SourceType:  "attribute",
-				SourceName:  "Public",
-			}, func() decision.Decision {
-				return resolver.HasAttributePublic(ctx, resource)
-			})
-		})
-
-	}
-	if actor != nil {
-		switch action {
-		case RepositoryPermissionRead:
-			// Source: role - Owner
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Owner",
-				}, func() decision.Decision {
-					return resolver.HasRoleOwner(ctx, actor, resource)
-				})
-			})
-
-			// Source: role - Editor
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Editor",
-				}, func() decision.Decision {
-					return resolver.HasRoleEditor(ctx, actor, resource)
-				})
-			})
-
-			// Source: role - Viewer
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Viewer",
-				}, func() decision.Decision {
-					return resolver.HasRoleViewer(ctx, actor, resource)
-				})
-			})
-
-		case RepositoryPermissionPush:
-			// Source: role - Owner
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Owner",
-				}, func() decision.Decision {
-					return resolver.HasRoleOwner(ctx, actor, resource)
-				})
-			})
-
-			// Source: role - Editor
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Editor",
-				}, func() decision.Decision {
-					return resolver.HasRoleEditor(ctx, actor, resource)
-				})
-			})
-
-		case RepositoryPermissionDelete:
-			// Source: role - Owner
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Owner",
-				}, func() decision.Decision {
-					return resolver.HasRoleOwner(ctx, actor, resource)
-				})
-			})
-
-		case RepositoryPermissionSnakeCase:
-			// Source: role - Owner
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "repository",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Owner",
-				}, func() decision.Decision {
-					return resolver.HasRoleOwner(ctx, actor, resource)
-				})
-			})
-
-		}
-	}
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	var allowReason string
-	var denyReasons []string
-	for result := range results {
-		if result.Reason == "" {
-			result.Reason = "unspecified"
-		}
-		if result.Allow {
-			cancel()
-			allowReason = result.Reason
-		} else {
-			denyReasons = append(denyReasons, result.Reason)
-		}
-	}
-
-	if allowReason != "" {
-		return decision.True(allowReason)
-	} else {
-		result := decision.False(strings.Join(denyReasons, ", "))
-		if result.Reason == "" {
-			result.Reason = "unspecified"
-		}
-		return result
-	}
+func (af AuthorizerFunc) Authorize(ctx context.Context, actor *models.User, permission Permission, resource any) error {
+	return af(ctx, actor, permission, resource)
 }
 
-func (a Authorizer) AuthorizeUser(ctx context.Context, actor *models.User, action UserPermission, resource *models.User) decision.Decision {
-	resolver := a.User()
+type authorizerResult struct {
+	allow  bool
+	source string
+	error  error
+}
 
-	if !action.Valid() {
-		return decision.Error(ErrInvalidUserPermission)
-	}
-
-	if resource == nil {
-		return decision.False("unmatched")
-	}
-	var cancel func()
-	ctx, cancel = context.WithCancel(ctx)
-	defer cancel()
-
-	results := make(chan decision.Decision)
-
-	var wg conc.WaitGroup
-
-	if actor != nil {
-		switch action {
-		case UserPermissionRead:
-			// Source: role - Admin
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "user",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Admin",
-				}, func() decision.Decision {
-					return resolver.HasRoleAdmin(ctx, actor, resource)
-				})
-			})
-
-			// Source: role - Self
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "user",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Self",
-				}, func() decision.Decision {
-					return resolver.HasRoleSelf(ctx, actor, resource)
-				})
-			})
-
-			// Source: role - Viewer
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "user",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Viewer",
-				}, func() decision.Decision {
-					return resolver.HasRoleViewer(ctx, actor, resource)
-				})
-			})
-
-		case UserPermissionWrite:
-			// Source: role - Admin
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "user",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Admin",
-				}, func() decision.Decision {
-					return resolver.HasRoleAdmin(ctx, actor, resource)
-				})
-			})
-
-			// Source: role - Self
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "user",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Self",
-				}, func() decision.Decision {
-					return resolver.HasRoleSelf(ctx, actor, resource)
-				})
-			})
-
-		case UserPermissionDelete:
-			// Source: role - Admin
-			wg.Go(func() {
-				results <- cache.Query(ctx, cache.CacheKey{
-					ActorKey:    a.CacheKey(actor),
-					Resource:    "user",
-					ResourceKey: resolver.CacheKey(resource),
-					SourceType:  "role",
-					SourceName:  "Admin",
-				}, func() decision.Decision {
-					return resolver.HasRoleAdmin(ctx, actor, resource)
-				})
-			})
-
-		}
-	}
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	var allowReason string
-	var denyReasons []string
-	for result := range results {
-		if result.Reason == "" {
-			result.Reason = "unspecified"
-		}
-		if result.Allow {
-			cancel()
-			allowReason = result.Reason
-		} else {
-			denyReasons = append(denyReasons, result.Reason)
-		}
-	}
-
-	if allowReason != "" {
-		return decision.True(allowReason)
-	} else {
-		result := decision.False(strings.Join(denyReasons, ", "))
-		if result.Reason == "" {
-			result.Reason = "unspecified"
-		}
-		return result
-	}
+var authorizerData = map[Permission]struct {
+	Attributes []Attribute
+	Roles      []Role
+}{
+	PermissionGlobalReadAllProfiles: {
+		Attributes: []Attribute{AttributeGlobalProfilesArePublic},
+		Roles:      []Role{},
+	},
+	PermissionGlobalReadAllUsers: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleGlobalAdmin},
+	},
+	PermissionGlobalWriteAllUsers: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleGlobalAdmin},
+	},
+	PermissionRepositoryDelete: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleRepositoryOwner},
+	},
+	PermissionRepositoryPush: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleRepositoryOwner, RoleRepositoryEditor},
+	},
+	PermissionRepositoryRead: {
+		Attributes: []Attribute{AttributeRepositoryPublic},
+		Roles:      []Role{RoleRepositoryOwner, RoleRepositoryEditor, RoleRepositoryViewer},
+	},
+	PermissionRepositorySnakeCase: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleRepositoryOwner},
+	},
+	PermissionUserDelete: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleUserAdmin},
+	},
+	PermissionUserRead: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleUserAdmin, RoleUserSelf, RoleUserViewer},
+	},
+	PermissionUserWrite: {
+		Attributes: []Attribute{},
+		Roles:      []Role{RoleUserAdmin, RoleUserSelf},
+	},
 }
 
 // Authorizer
-type Authorizer struct {
-	Resolver
+type authorizer struct {
+	resolver Resolver
 }
 
-func (a Authorizer) Authorize(ctx context.Context, actor *models.User, permission string, resourceType string, resource any) decision.Decision {
-	switch resourceType {
-	case "global":
-		perm, err := ParseGlobalPermission(permission)
-		if err != nil {
-			return decision.Error(err)
-		}
-		return a.AuthorizeGlobal(ctx, actor, perm)
-	case "repository":
-		perm, err := ParseRepositoryPermission(permission)
-		resource, _ := resource.(*models.Repository)
-		if err != nil {
-			return decision.Error(err)
-		}
-		return a.AuthorizeRepository(ctx, actor, perm, resource)
-	case "user":
-		perm, err := ParseUserPermission(permission)
-		resource, _ := resource.(*models.User)
-		if err != nil {
-			return decision.Error(err)
-		}
-		return a.AuthorizeUser(ctx, actor, perm, resource)
+func (a authorizer) Authorize(ctx context.Context, actor *models.User, permission Permission, resource any) error {
+	var cancel func()
+	ctx, cancel = context.WithCancel(ctx)
+	defer cancel()
+
+	results := make(chan authorizerResult)
+	var wg conc.WaitGroup
+
+	authorizerData, ok := authorizerData[permission]
+	if !ok {
+		return fmt.Errorf("invalid permission %s", permission)
 	}
 
-	return decision.False("unmatched")
+	for _, attribute := range authorizerData.Attributes {
+		attribute := attribute
+		wg.Go(func() {
+			allow, err := a.resolver.HasAttribute(ctx, resource, attribute)
+			results <- authorizerResult{
+				allow:  allow,
+				error:  err,
+				source: fmt.Sprintf("attribute %s", attribute),
+			}
+		})
+	}
+	if actor != nil {
+		for _, role := range authorizerData.Roles {
+			role := role
+			wg.Go(func() {
+				allow, err := a.resolver.HasRole(ctx, actor, resource, role)
+				results <- authorizerResult{
+					allow:  allow,
+					error:  err,
+					source: fmt.Sprintf("role %s", role),
+				}
+			})
+		}
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var denyReasons []string
+	for result := range results {
+		if errors.Is(result.error, context.Canceled) {
+			continue
+		}
+		if result.error != nil {
+			cancel()
+			for range results {
+				// drain channel
+			}
+			return result.error
+		}
+		if result.allow {
+			cancel()
+			for range results {
+				// drain channel
+			}
+			return fmt.Errorf("authorize %s: %w: has %s", permission, Allow, result.source)
+		}
+		denyReasons = append(denyReasons, fmt.Sprintf("%s", result.source))
+	}
+
+	return fmt.Errorf("authorize %s: %w: missing %s", permission, Deny, strings.Join(denyReasons, ", "))
 }
 
-func NewAuthorizer(resolver Resolver) *Authorizer {
-	return &Authorizer{Resolver: resolver}
+func NewAuthorizer(resolver Resolver) Authorizer {
+	return authorizer{resolver: resolver}
 }

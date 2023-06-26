@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"github.com/iancoleman/strcase"
 	"github.com/samber/lo"
 )
 
@@ -24,7 +23,7 @@ func GetRoleSources(permission string, roles []RoleSchema) []PermissionSource {
 		if lo.Contains(role.Permissions, permission) {
 			sources = append(sources, PermissionSource{
 				Type: PermissionTypeRole,
-				Name: strcase.ToCamel(strcase.ToCamel(role.Name)),
+				Name: role.Name,
 			})
 		}
 	}
@@ -39,7 +38,7 @@ func GetAttributeSources(permission string, attributes []AttributeSchema) []Perm
 		if lo.Contains(attr.Permissions, permission) {
 			sources = append(sources, PermissionSource{
 				Type: PermissionTypeAttribute,
-				Name: strcase.ToCamel(strcase.ToCamel(attr.Name)),
+				Name: attr.Name,
 			})
 		}
 	}

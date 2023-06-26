@@ -1,7 +1,8 @@
-package test
+package main_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/endigma/toucan/_examples/basic/gen/toucan"
@@ -20,64 +21,67 @@ func TestAuthorization(t *testing.T) {
 		models.NewUser("Jerry", false, models.RepositoryRole{Role: "editor", Repo: google.ID}),
 		models.NewUser("Graham", false, models.RepositoryRole{Role: "viewer", Repo: facebook.ID})
 
-	authorizer := toucan.NewAuthorizer(resolvers.NewResolver())
+	resolver := toucan.NewResolver(resolvers.NewResolver())
+	authorizer := toucan.NewAuthorizer(resolver)
 
-	assert.True(t, authorizer.Repository().HasRoleEditor(ctx, jerry, google).Allow)
+	isEditor, err := resolver.HasRole(ctx, jerry, google, toucan.RoleRepositoryEditor)
+	assert.NoError(t, err)
+	assert.True(t, isEditor)
 
 	// Define test cases
 	testCases := []struct {
 		name     string
 		user     *models.User
-		action   string
+		action   toucan.Permission
 		repo     *models.Repository
 		expected bool
 	}{
 		{
 			name:     "Tom can read Facebook",
 			user:     tom,
-			action:   "read",
+			action:   toucan.PermissionRepositoryRead,
 			repo:     facebook,
 			expected: true,
 		},
 		{
 			name:     "Tom can delete Facebook",
 			user:     tom,
-			action:   "delete",
+			action:   toucan.PermissionRepositoryDelete,
 			repo:     facebook,
 			expected: true,
 		},
 		{
 			name:     "Jerry can read Google",
 			user:     jerry,
-			action:   "read",
+			action:   toucan.PermissionRepositoryRead,
 			repo:     google,
 			expected: true,
 		},
 		{
 			name:     "Graham can read Facebook",
 			user:     graham,
-			action:   "read",
+			action:   toucan.PermissionRepositoryRead,
 			repo:     facebook,
 			expected: true,
 		},
 		{
 			name:     "Jerry cannot read Facebook",
 			user:     jerry,
-			action:   "read",
+			action:   toucan.PermissionRepositoryRead,
 			repo:     facebook,
 			expected: false,
 		},
 		{
 			name:     "Graham cannot delete Facebook",
 			user:     graham,
-			action:   "delete",
+			action:   toucan.PermissionRepositoryDelete,
 			repo:     facebook,
 			expected: false,
 		},
 		{
 			name:     "Jerry cannot delete Google",
 			user:     jerry,
-			action:   "delete",
+			action:   toucan.PermissionRepositoryDelete,
 			repo:     google,
 			expected: false,
 		},
@@ -85,8 +89,14 @@ func TestAuthorization(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := authorizer.Authorize(ctx, tc.user, tc.action, "repository", tc.repo)
-			assert.Equal(t, result.Allow, tc.expected, "Reason: %s", result.Reason)
+			err := authorizer.Authorize(ctx, tc.user, tc.action, tc.repo)
+			if tc.expected {
+				assert.True(t, errors.Is(err, toucan.Allow))
+				t.Log(err)
+			} else {
+				assert.True(t, errors.Is(err, toucan.Deny))
+				t.Log(err)
+			}
 		})
 	}
 }

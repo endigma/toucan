@@ -3,16 +3,66 @@ package codegen
 import (
 	. "github.com/dave/jennifer/jen"
 	"github.com/endigma/toucan/schema"
+	"github.com/samber/lo"
 )
 
-func (gen *Generator) generateResourceTypes(file *File, resource schema.ResourceSchema) {
-	// Generate permissions enum
-	if len(resource.Permissions) > 0 {
-		enumGen := newEnumGenerator(resource.Name+"Permission", resource.Permissions, EnumGeneratorFeatures{})
-		enumGen.Generate(file.Group)
-	}
+func (gen *Generator) generateAttributeEnums(file *File) {
+	roleNames := lo.FlatMap(gen.Schema.Resources, func(resource schema.ResourceSchema, _ int) []string {
+		return lo.Map(
+			resource.Roles,
+			func(schema schema.RoleSchema, _ int) string { return resource.Name + "_" + schema.Name },
+		)
+	})
 
-	file.Line()
+	roleValues := lo.FlatMap(gen.Schema.Resources, func(resource schema.ResourceSchema, _ int) []string {
+		return lo.Map(
+			resource.Roles,
+			func(schema schema.RoleSchema, _ int) string { return resource.Name + "." + schema.Name },
+		)
+	})
+
+	roleGen := newEnumGenerator("Role", roleNames, roleValues, EnumGeneratorFeatures{})
+	roleGen.Generate(file.Group)
+
+	attributeNames := lo.FlatMap(gen.Schema.Resources, func(resource schema.ResourceSchema, _ int) []string {
+		return lo.Map(
+			resource.Attributes,
+			func(schema schema.AttributeSchema, _ int) string { return resource.Name + "_" + schema.Name },
+		)
+	})
+
+	attributeValues := lo.FlatMap(gen.Schema.Resources, func(resource schema.ResourceSchema, _ int) []string {
+		return lo.Map(
+			resource.Attributes,
+			func(schema schema.AttributeSchema, _ int) string { return resource.Name + "." + schema.Name },
+		)
+	})
+
+	attributeGen := newEnumGenerator("Attribute", attributeNames, attributeValues, EnumGeneratorFeatures{})
+	attributeGen.Generate(file.Group)
+}
+
+func (gen *Generator) generatePermissionEnum(file *File) {
+	permissionNames := lo.FlatMap(gen.Schema.Resources, func(resource schema.ResourceSchema, _ int) []string {
+		return lo.Map(
+			resource.Permissions,
+			func(name string, _ int) string {
+				return resource.Name + "_" + name
+			},
+		)
+	})
+
+	permissionValues := lo.FlatMap(gen.Schema.Resources, func(resource schema.ResourceSchema, _ int) []string {
+		return lo.Map(
+			resource.Permissions,
+			func(name string, _ int) string {
+				return resource.Name + "." + name
+			},
+		)
+	})
+
+	permissionGen := newEnumGenerator("Permission", permissionNames, permissionValues, EnumGeneratorFeatures{})
+	permissionGen.Generate(file.Group)
 }
 
 type enumGenerator struct {
@@ -23,6 +73,7 @@ type enumGenerator struct {
 	errInvalid string
 	errNil     string
 
+	names  []string
 	values []string
 
 	features EnumGeneratorFeatures
@@ -35,7 +86,7 @@ type EnumGeneratorFeatures struct {
 	ValidHelper          bool
 }
 
-func newEnumGenerator(name string, values []string, features EnumGeneratorFeatures) *enumGenerator {
+func newEnumGenerator(name string, names, values []string, features EnumGeneratorFeatures) *enumGenerator {
 	return &enumGenerator{
 		enumName:   pascal(name),
 		parserName: "Parse" + pascal(name),
@@ -44,6 +95,7 @@ func newEnumGenerator(name string, values []string, features EnumGeneratorFeatur
 		errInvalid: "ErrInvalid" + pascal(name),
 		errNil:     "ErrNil" + pascal(name),
 
+		names:  names,
 		values: values,
 
 		features: features,
@@ -55,8 +107,8 @@ func (gen *enumGenerator) Generate(group *Group) {
 
 	// Constants
 	group.Const().DefsFunc(func(group *Group) {
-		for _, value := range gen.values {
-			group.Id(gen.enumName + pascal(value)).Id(pascal(gen.enumName)).Op("=").Lit(snake(value))
+		for i, name := range gen.names {
+			group.Id(gen.enumName + pascal(name)).Id(pascal(gen.enumName)).Op("=").Lit(gen.values[i])
 		}
 	}).Line()
 
@@ -80,13 +132,13 @@ func (gen *enumGenerator) Generate(group *Group) {
 	// Definitions
 	group.Var().Defs(
 		Id(gen.namesMap).Op("=").Map(String()).Id(gen.enumName).Values(DictFunc(func(d Dict) {
-			for _, value := range gen.values {
-				d[Lit(snake(value))] = Id(gen.enumName + pascal(value))
+			for i, name := range gen.names {
+				d[Lit(gen.values[i])] = Id(gen.enumName + pascal(name))
 			}
 		})),
 		Id(gen.namesArray).Op("=").Index().String().ValuesFunc(func(group *Group) {
-			for _, value := range gen.values {
-				group.String().Parens(Id(gen.enumName + pascal(value)))
+			for _, name := range gen.names {
+				group.String().Parens(Id(gen.enumName + pascal(name)))
 			}
 		}),
 	).Line()
@@ -115,12 +167,6 @@ func (gen *enumGenerator) generateParser(group *Group) {
 	group.Func().Id(gen.parserName).Params(Id("s").String()).Params(Id(gen.enumName), Error()).Block(
 		If(
 			List(Id("x"), Id("ok")).Op(":=").Id(gen.namesMap).Index(Id("s")),
-			Id("ok"),
-		).Block(Return(Id("x"), Nil())),
-		Line().Comment("Try to parse from snake case"),
-		If(
-			List(Id("x"), Id("ok")).Op(":=").Id(gen.namesMap).
-				Index(Qual("github.com/iancoleman/strcase", "ToSnake").Call(Id("s"))),
 			Id("ok"),
 		).Block(Return(Id("x"), Nil())),
 		Line(),

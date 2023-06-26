@@ -5,49 +5,40 @@ import (
 
 	"github.com/endigma/toucan/_examples/basic/gen/toucan"
 	"github.com/endigma/toucan/_examples/basic/models"
-	"github.com/endigma/toucan/decision"
 )
 
-func (e repositoryResolver) CacheKey(resource *models.Repository) string {
-	return resource.ID.String()
-}
-
-func (e repositoryResolver) HasRoleOwner(context context.Context, actor *models.User, resource *models.Repository) decision.Decision {
+func (e repositoryResolver) HasRoleOwner(context context.Context, actor *models.User, resource *models.Repository) (bool, error) {
 	for _, role := range actor.Roles {
 		if role.Repo == resource.ID && role.Role == "owner" {
-			return decision.True("actor is viewer")
+			return true, nil
 		}
 	}
 
-	return decision.False("no viewer role")
+	return false, nil
 }
 
-func (e repositoryResolver) HasRoleEditor(context context.Context, actor *models.User, resource *models.Repository) decision.Decision {
+func (e repositoryResolver) HasRoleEditor(context context.Context, actor *models.User, resource *models.Repository) (bool, error) {
 	for _, role := range actor.Roles {
 		if role.Repo == resource.ID && role.Role == "editor" {
-			return decision.True("actor is viewer")
+			return true, nil
 		}
 	}
 
-	return decision.False("no viewer role")
+	return false, nil
 }
 
-func (e repositoryResolver) HasRoleViewer(context context.Context, actor *models.User, resource *models.Repository) decision.Decision {
+func (e repositoryResolver) HasRoleViewer(context context.Context, actor *models.User, resource *models.Repository) (bool, error) {
 	for _, role := range actor.Roles {
 		if role.Repo == resource.ID && role.Role == "viewer" {
-			return decision.True("actor is viewer")
+			return true, nil
 		}
 	}
 
-	return decision.False("no viewer role")
+	return false, nil
 }
 
-func (e repositoryResolver) HasAttributePublic(context context.Context, resource *models.Repository) decision.Decision {
-	if resource.Public {
-		return decision.True("repository is public")
-	} else {
-		return decision.False("repository is private")
-	}
+func (e repositoryResolver) HasAttributePublic(context context.Context, resource *models.Repository) (bool, error) {
+	return resource.Public, nil
 }
 
 type repositoryResolver struct{ *Resolver }
