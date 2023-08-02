@@ -168,6 +168,8 @@ func (gen *Generator) generateAuthorizerRoot(group *Group) {
 			),
 		),
 		Line(),
+		Qual("sort", "Strings").Call(Qual("sort", "StringSlice").Call(Id("denyReasons"))),
+		Line(),
 		Return(Qual("fmt", "Errorf").Call(
 			Lit("authorize %s: %w: missing %s"),
 			Id("permission"),

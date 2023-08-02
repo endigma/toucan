@@ -5,9 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
+
 	models "github.com/endigma/toucan/_examples/basic/models"
 	conc "github.com/sourcegraph/conc"
-	"strings"
 )
 
 type Authorizer interface {
@@ -141,6 +143,8 @@ func (a authorizer) Authorize(ctx context.Context, actor *models.User, permissio
 		}
 		denyReasons = append(denyReasons, fmt.Sprintf("%s", result.source))
 	}
+
+	sort.Sort(sort.StringSlice(denyReasons))
 
 	return fmt.Errorf("authorize %s: %w: missing %s", permission, Deny, strings.Join(denyReasons, ", "))
 }
